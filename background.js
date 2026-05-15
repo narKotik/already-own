@@ -617,7 +617,8 @@ async function fetchSteamViaStoreApi(steamId) {
   const ud = await udResp.json();
   const rawIds = ud?.rgOwnedApps;
   if (!Array.isArray(rawIds) || rawIds.length === 0) {
-    throw new Error("rgOwnedApps missing or empty — store session may not be authenticated");
+    error("Steam store session not active (rgOwnedApps empty)");
+    throw { message: "Not signed in to Steam. Open store.steampowered.com in Chrome and sign in, then try again.", logs: [...logs] };
   }
   // Normalize to numbers — some Steam API variants return string IDs
   const ownedIds = rawIds.map(Number).filter(n => n > 0);
