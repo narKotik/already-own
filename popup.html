@@ -64,8 +64,10 @@
     .btn-secondary { background:var(--surface2); color:#c6d4df; border:1px solid var(--border); }
     .btn-secondary:hover { background:#263142; border-color:#4a5568; }
     .btn:disabled { opacity:.45; cursor:not-allowed; }
-    #status { font-size:11px; min-height:14px; text-align:center; color:var(--muted); transition:color .2s; }
-    #status.ok { color:var(--green); } #status.warn { color:var(--orange); } #status.err { color:var(--red); }
+    #status { font-size:11px; min-height:14px; text-align:center; color:var(--muted); transition:all .2s; border-radius:6px; }
+    #status.ok   { color:var(--green); }
+    #status.warn { color:#fff; background:rgba(210,153,34,.25); border:1px solid rgba(210,153,34,.5); padding:6px 10px; font-weight:600; }
+    #status.err  { color:#fff; background:rgba(248,81,73,.2);  border:1px solid rgba(248,81,73,.5);  padding:6px 10px; font-weight:600; }
     .spinner { width:11px; height:11px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; display:none; }
     @keyframes spin { to { transform:rotate(360deg); } }
 
