@@ -16,7 +16,7 @@
 
     /* Header */
     .header { background: linear-gradient(135deg,#0d1b2a,#0f2034); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
-    .header-logo { width: 32px; height: 32px; background: var(--epic); border-radius: 7px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0,120,242,.4); flex-shrink: 0; }
+    .header-logo { width: 32px; height: 32px; flex-shrink: 0; }
     .header-name { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: #fff; line-height: 1; }
     .header-sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
     .header-ver { margin-left: auto; font-size: 10px; color: var(--muted); background: var(--surface2); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
@@ -137,9 +137,7 @@
 <body>
 
 <div class="header">
-  <div class="header-logo">
-    <svg width="20" height="20" viewBox="0 0 32 32" fill="none"><path d="M10 11h12v2.5H13v2h8v2.5h-8v2H22V22.5H10V11z" fill="white"/></svg>
-  </div>
+  <img class="header-logo" src="icons/icon48.png" alt="">
   <div>
     <div class="header-name">Already Own?</div>
     <div class="header-sub">Epic &amp; Steam ownership checker</div>
