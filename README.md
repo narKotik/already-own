@@ -2,6 +2,8 @@
 
 Cross-library ownership checker. Shows whether you already own a game on Epic or Steam before buying it on the other store.
 
+If you find it useful: [☕ Buy me a coffee](https://ko-fi.com/aleadyown)
+
 ## Features
 
 - **📚 Epic Library Scanner** — Reads your owned games from the Epic Games Store
