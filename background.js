@@ -1,10 +1,10 @@
-// background.js v1.4.0
+// background.js v1.4.1
 // ALL network requests happen here — service workers are not subject to CORS.
 // The content script just grabs auth tokens from the page and sends them here.
 
 const LIBRARY_KEY = "elsLibrary";   // [{title, source}]  source: "epic"|"steam"|"other"
 const IGNORE_KEY  = "elsIgnoredGames"; // [{title, source}]
-const VERSION = "1.4.0";
+const VERSION = "1.4.1";
 let DEBUG = false; // set true (or via Debug logs checkbox in popup) to enable full title-list dumps
 
 // ── Logger ────────────────────────────────────────────────────────────────
@@ -68,12 +68,21 @@ async function getEpicAuthFromCookies() {
 
   try {
     const all = await chrome.cookies.getAll({ domain: ".epicgames.com" });
-    const tokenCookie = all.find(c => !c.name.startsWith("_") && looksLikeToken(c.value));
+    const tokenCookie = all.find(c =>
+      !c.name.startsWith("_") &&
+      !c.name.toUpperCase().includes("REFRESH") &&
+      looksLikeToken(c.value)
+    );
     if (tokenCookie) {
       info(`Found token in cookie: ${tokenCookie.name} (${tokenCookie.value.length} chars)`);
       return tokenCookie.value;
     }
-    info(`No valid auth token found in cookies. Sign in at store.epicgames.com in Chrome.`);
+    const refreshOnly = all.find(c => c.name.toUpperCase().includes("REFRESH") && looksLikeToken(c.value));
+    if (refreshOnly) {
+      info(`Only a refresh token found (${refreshOnly.name}) — session expired. Open store.epicgames.com in Chrome while signed in, then retry.`);
+    } else {
+      info(`No valid auth token found in cookies. Sign in at store.epicgames.com in Chrome.`);
+    }
   } catch (e) {
     warn("Could not list cookies", e.message);
   }
@@ -160,26 +169,26 @@ async function fetchViaGraphQL(authToken) {
 
   const headers = { ...authHeaders(authToken), "Content-Type": "application/json" };
 
-  // Try the library query first (used by Epic's store web app), then fall back to entitlements
+  // Query namespace + catalogItemId (title was removed from OfferEntitlements schema).
+  // Resolve real game names via catalog API using the same mechanism as Library Service.
   const queries = [
     {
-      // 'offers' was removed from OfferEntitlements type — query only namespace and title.
       name: "GetMyEntitlements",
       body: JSON.stringify({
         query: `{
           Launcher {
             entitledOfferItems {
               namespace
-              title
+              catalogItemId
             }
           }
         }`,
       }),
-      extract: (json) => {
+      extract: async (json) => {
         const items = json?.data?.Launcher?.entitledOfferItems;
         if (!items?.length) return null;
-        info("GraphQL OfferEntitlements sample", items[0]);
-        const titles = items.map(i => i.title).filter(Boolean);
+        info("GraphQL OfferEntitlements count", items.length);
+        const titles = await fetchCatalogTitles(items, authToken, "graphql");
         return titles.length ? titles : null;
       },
     },
@@ -202,7 +211,7 @@ async function fetchViaGraphQL(authToken) {
       info(`GraphQL errors (${q.name})`, json.errors.map(e => e.message).join("; "));
       continue;
     }
-    const titles = q.extract(json);
+    const titles = await q.extract(json);
     if (titles === null) {
       info(`GraphQL unexpected shape (${q.name})`, json?.data);
       continue;
