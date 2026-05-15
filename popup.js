@@ -370,9 +370,11 @@ function setAuthState(auth) {
   if (auth) {
     scanLabel.textContent = "🎮 Scan Epic Library";
     scanDesc.textContent = "Reads your owned games from Epic's API using your browser session.";
+    scanDesc.classList.remove("warn");
   } else {
     scanLabel.textContent = "🔗 Open Epic Store & Scan";
     scanDesc.textContent = "You're not signed in to Epic. Click to open the store, sign in, then scan.";
+    scanDesc.classList.add("warn");
   }
 }
 
@@ -441,9 +443,11 @@ function setSteamAuthState(auth) {
   if (auth) {
     steamLabel.textContent = "🎮 Scan Steam Library";
     steamScanDesc.textContent = "Reads your owned games from Steam using your browser session.";
+    steamScanDesc.classList.remove("warn");
   } else {
     steamLabel.textContent = "🔗 Open Steam & Scan";
     steamScanDesc.textContent = "You're not signed in to Steam. Click to open the store, sign in, then scan.";
+    steamScanDesc.classList.add("warn");
   }
 }
 
