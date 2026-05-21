@@ -90,9 +90,11 @@ function applyI18n() {
   document.querySelectorAll("[data-i18n-ph]").forEach(el => {
     el.placeholder = t(el.dataset.i18nPh);
   });
-  // Update dynamic text that depends on current state
   document.getElementById("ignored-hint-text").textContent = t("lib_ignored_hint");
   document.getElementById("dismissed-hint-text").textContent = t("lib_dismissed_hint");
+  // Scan button labels depend on auth state, not data-i18n attributes
+  setAuthState(hasAuth);
+  setSteamAuthState(hasSteamAuth);
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────
