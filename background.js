@@ -511,7 +511,7 @@ async function doScan(authFromPage, accountIdFromPage) {
 async function fetchNamesFromProfilePage(steamId) {
   let bgTab = null;
   try {
-    const url = `https://steamcommunity.com/profiles/${steamId}/games/?tab=all&sort=name`;
+    const url = `https://steamcommunity.com/profiles/${steamId}/games/?tab=all&sort=name&l=english`;
     info("Profile page: opening", url);
     bgTab = await chrome.tabs.create({ url, active: false });
 
