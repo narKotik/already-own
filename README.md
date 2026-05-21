@@ -115,12 +115,19 @@ Enable **Debug logs** (checkbox at the bottom of the popup), run a scan, then op
 ## File Structure
 
 ```
-├── manifest.json       # Extension config (Manifest V3)
-├── background.js       # Service worker — all network requests happen here
-├── content_epic.js     # Runs on epicgames.com — auth extraction + Epic store badge
-├── content_steam.js    # Runs on steampowered.com — Steam store badge
-├── popup.html / popup.js  # Extension popup UI
+├── manifest.json           # Extension config (Manifest V3)
+├── background.js           # Service worker — all network requests happen here
+├── content_epic.js         # Runs on epicgames.com — auth extraction + Epic store badge
+├── content_steam.js        # Runs on steampowered.com — Steam store badge
+├── popup.html / popup.js   # Extension popup UI
 ├── importer.html / importer.js  # Dedicated import tab (avoids popup-closes-on-file-picker)
+├── locales/                # UI translations (loaded by popup and content scripts)
+│   ├── en-US.json          # English (default)
+│   ├── pt-BR.json          # Português (Brasil)
+│   ├── es-419.json         # Español (Latinoamérica)
+│   ├── pl.json             # Polski
+│   ├── tr.json             # Türkçe
+│   └── uk.json             # Українська
 └── icons/
 ```
 
