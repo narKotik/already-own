@@ -73,8 +73,6 @@
   "settings_match_fuzzy_hint": "≥75% de superposición de palabras",
   "settings_language": "Idioma",
   "settings_ui_locale": "Idioma de la aplicación",
-  "settings_notifications": "Notificaciones",
-  "settings_toasts": "Mostrar notificación de resultado del escaneo",
   "settings_debug_section": "Depuración",
   "settings_debug_logs": "Mostrar pestaña Registros",
   "settings_clear_section": "Borrar datos",
@@ -89,8 +87,5 @@
   "badge_partial": "Coincidencia de título",
   "badge_fuzzy": "Coincidencia probable",
   "badge_dismiss": "Descartar",
-  "toast_zero": "⚠️ Escaneo ejecutado pero 0 juegos encontrados",
-  "toast_done": "✅ {total} juegos guardados vía {method}",
-  "toast_fail": "❌ Escaneo falló — revisa la pestaña Registros",
   "footer_info": "Coincidencia por similitud de título"
 }

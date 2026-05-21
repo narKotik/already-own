@@ -73,8 +73,6 @@
   "settings_match_fuzzy_hint": "≥75% nakładania się słów",
   "settings_language": "Język",
   "settings_ui_locale": "Język aplikacji",
-  "settings_notifications": "Powiadomienia",
-  "settings_toasts": "Pokaż powiadomienie o wyniku skanowania",
   "settings_debug_section": "Debugowanie",
   "settings_debug_logs": "Pokaż zakładkę Logi",
   "settings_clear_section": "Wyczyść dane",
@@ -89,8 +87,5 @@
   "badge_partial": "Dopasowanie tytułu",
   "badge_fuzzy": "Prawdopodobne dopasowanie",
   "badge_dismiss": "Odrzuć",
-  "toast_zero": "⚠️ Skanowanie wykonano, ale znaleziono 0 gier",
-  "toast_done": "✅ Zapisano {total} gier przez {method}",
-  "toast_fail": "❌ Skanowanie nie powiodło się — sprawdź zakładkę Logi",
   "footer_info": "Dopasowywanie według podobieństwa tytułu"
 }

@@ -73,8 +73,6 @@
   "settings_match_fuzzy_hint": "≥75% збігу слів",
   "settings_language": "Мова",
   "settings_ui_locale": "Мова інтерфейсу",
-  "settings_notifications": "Сповіщення",
-  "settings_toasts": "Показувати сповіщення про результат сканування",
   "settings_debug_section": "Налагодження",
   "settings_debug_logs": "Показати вкладку Журнали",
   "settings_clear_section": "Очистити дані",
@@ -89,8 +87,5 @@
   "badge_partial": "Збіг назви",
   "badge_fuzzy": "Ймовірний збіг",
   "badge_dismiss": "Закрити",
-  "toast_zero": "⚠️ Сканування виконано, але знайдено 0 ігор",
-  "toast_done": "✅ Збережено {total} ігор через {method}",
-  "toast_fail": "❌ Сканування не вдалося — перевірте вкладку Журнали",
   "footer_info": "Зіставлення за схожістю назви"
 }

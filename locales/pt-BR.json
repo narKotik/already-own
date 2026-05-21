@@ -73,8 +73,6 @@
   "settings_match_fuzzy_hint": "≥75% de sobreposição de palavras",
   "settings_language": "Idioma",
   "settings_ui_locale": "Idioma do aplicativo",
-  "settings_notifications": "Notificações",
-  "settings_toasts": "Mostrar notificação de resultado do scan",
   "settings_debug_section": "Depuração",
   "settings_debug_logs": "Mostrar aba Logs",
   "settings_clear_section": "Limpar dados",
@@ -89,8 +87,5 @@
   "badge_partial": "Correspondência de título",
   "badge_fuzzy": "Correspondência provável",
   "badge_dismiss": "Dispensar",
-  "toast_zero": "⚠️ Scan executado mas 0 jogos encontrados",
-  "toast_done": "✅ {total} jogos salvos via {method}",
-  "toast_fail": "❌ Scan falhou — verifique a aba Logs",
   "footer_info": "Correspondência por similaridade de título"
 }

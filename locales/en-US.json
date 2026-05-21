@@ -73,8 +73,6 @@
   "settings_match_fuzzy_hint": "≥75% word overlap",
   "settings_language": "Language",
   "settings_ui_locale": "Display language",
-  "settings_notifications": "Notifications",
-  "settings_toasts": "Show scan result notification",
   "settings_debug_section": "Debug",
   "settings_debug_logs": "Show Logs tab",
   "settings_clear_section": "Clear data",
@@ -89,8 +87,5 @@
   "badge_partial": "Title match",
   "badge_fuzzy": "Likely match",
   "badge_dismiss": "Dismiss",
-  "toast_zero": "⚠️ Scan ran but found 0 games",
-  "toast_done": "✅ {total} games saved via {method}",
-  "toast_fail": "❌ Scan failed — check Logs tab",
   "footer_info": "Matching by title similarity"
 }

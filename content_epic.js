@@ -111,47 +111,13 @@
     return result;
   }
 
-  // ── Show toast ────────────────────────────────────────────────────────────
-  function showToast(message, color = "#4CAF50") {
-    document.getElementById("els-toast")?.remove();
-    const s = document.createElement("style");
-    s.textContent = `@keyframes elsFadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`;
-    document.head.appendChild(s);
-    const t = document.createElement("div");
-    t.id = "els-toast";
-    t.style.cssText = `position:fixed;bottom:24px;right:24px;background:${color};color:#fff;font-family:'Segoe UI',sans-serif;font-size:13px;font-weight:600;padding:12px 18px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.4);z-index:999999;display:flex;align-items:center;gap:8px;animation:elsFadeIn .3s ease;max-width:340px;`;
-    t.innerHTML = `<span style="font-size:18px">🎮</span><span>${message}</span>`;
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 5000);
-  }
-
   // ── Listen for scan trigger from popup ────────────────────────────────────
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.action === "scanEpicLibrary") {
       const auth = extractAuth();
-
       chrome.runtime.sendMessage(
         { action: "doScan", authToken: auth.authToken, accountId: auth.accountId },
-        (response) => {
-          sendResponse(response);
-          if (!response) return;
-          chrome.storage.local.get(SETTINGS_KEY, ({ elsSettings }) => {
-            const showToasts = elsSettings?.showToasts !== false;
-            if (!showToasts) return;
-            loadLocale(elsSettings?.uiLocale ?? "en-US").then(strings => {
-              if (response.success) {
-                showToast(
-                  response.games?.length === 0
-                    ? tr(strings, "toast_zero")
-                    : tr(strings, "toast_done", { total: response.total, method: response.method }),
-                  response.games?.length === 0 ? "#e67e22" : "#4CAF50"
-                );
-              } else {
-                showToast(tr(strings, "toast_fail"), "#e74c3c");
-              }
-            });
-          });
-        }
+        (response) => { sendResponse(response); }
       );
       return true; // async
     }

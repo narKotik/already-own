@@ -7,8 +7,7 @@ const SETTINGS_KEY  = "elsSettings";
 
 const DEFAULT_SETTINGS = {
   matchExact: true, matchPartial: true, matchFuzzy: true,
-  uiLocale: "en-US",
-  showToasts: true, debugLogs: false,
+  uiLocale: "en-US", debugLogs: false,
 };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────
@@ -41,7 +40,6 @@ const steamScanDesc  = document.getElementById("steam-scan-desc");
 const chkMatchExact   = document.getElementById("chk-match-exact");
 const chkMatchPartial = document.getElementById("chk-match-partial");
 const chkMatchFuzzy   = document.getElementById("chk-match-fuzzy");
-const chkShowToasts   = document.getElementById("chk-show-toasts");
 const chkDebugLogs    = document.getElementById("chk-debug-logs");
 const selUiLocale     = document.getElementById("sel-ui-locale");
 
@@ -116,7 +114,6 @@ function applySettingsToUI(s) {
   chkMatchExact.checked   = s.matchExact;
   chkMatchPartial.checked = s.matchPartial;
   chkMatchFuzzy.checked   = s.matchFuzzy;
-  chkShowToasts.checked   = s.showToasts;
   chkDebugLogs.checked    = s.debugLogs;
   selUiLocale.value       = s.uiLocale;
 }
@@ -610,11 +607,6 @@ btnSteamScan.addEventListener("click", () => {
     currentSettings.matchFuzzy   = chkMatchFuzzy.checked;
     saveSettings();
   });
-});
-
-chkShowToasts.addEventListener("change", () => {
-  currentSettings.showToasts = chkShowToasts.checked;
-  saveSettings();
 });
 
 selUiLocale.addEventListener("change", async () => {

@@ -57,10 +57,6 @@ At least one option must stay checked. Turning off fuzzy reduces false positives
 
 - **Display language** — translates the extension popup and store badges. Available languages: English (US), Português (Brasil), Español (Latinoamérica), Polski, Türkçe, Українська.
 
-### Notifications
-
-- **Show scan result notification** — toggles the in-page toast that appears after a scan completes.
-
 ### Debug
 
 - **Show Logs tab** — reveals the Logs tab with detailed scan diagnostics. Enable this before reporting a bug.

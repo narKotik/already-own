@@ -73,8 +73,6 @@
   "settings_match_fuzzy_hint": "≥%75 kelime örtüşmesi",
   "settings_language": "Dil",
   "settings_ui_locale": "Uygulama dili",
-  "settings_notifications": "Bildirimler",
-  "settings_toasts": "Tarama sonucu bildirimini göster",
   "settings_debug_section": "Hata Ayıklama",
   "settings_debug_logs": "Günlükler sekmesini göster",
   "settings_clear_section": "Verileri temizle",
@@ -89,8 +87,5 @@
   "badge_partial": "Başlık eşleşmesi",
   "badge_fuzzy": "Olası eşleşme",
   "badge_dismiss": "Kapat",
-  "toast_zero": "⚠️ Tarama çalıştı ancak 0 oyun bulundu",
-  "toast_done": "✅ {total} oyun {method} aracılığıyla kaydedildi",
-  "toast_fail": "❌ Tarama başarısız — Günlükler sekmesini kontrol edin",
   "footer_info": "Başlık benzerliğine göre eşleştirme"
 }
