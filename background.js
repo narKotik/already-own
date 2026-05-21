@@ -155,95 +155,7 @@ function authHeaders(authToken) {
   return h;
 }
 
-// ── Method 1: GraphQL (with Authorization header from cookie) ─────────────
-async function fetchViaGraphQL(authToken) {
-  // graphql.epicgames.com/graphql is decommissioned (404). Current endpoint is the store BFF.
-  const GQL_URL = "https://store.epicgames.com/graphql";
-  info("Method 1: GraphQL", GQL_URL);
-
-  if (!authToken) {
-    info("No auth token — attempting unauthenticated (will likely fail with 401)");
-  } else {
-    info("Using Bearer token", `present (${authToken.length} chars)`);
-  }
-
-  const headers = { ...authHeaders(authToken), "Content-Type": "application/json" };
-
-  // Query namespace + catalogItemId (title was removed from OfferEntitlements schema).
-  // Resolve real game names via catalog API using the same mechanism as Library Service.
-  const queries = [
-    {
-      name: "GetMyEntitlements",
-      body: JSON.stringify({
-        query: `{
-          Launcher {
-            entitledOfferItems {
-              namespace
-              catalogItemId
-            }
-          }
-        }`,
-      }),
-      extract: async (json) => {
-        const items = json?.data?.Launcher?.entitledOfferItems;
-        if (!items?.length) return null;
-        info("GraphQL OfferEntitlements count", items.length);
-        const titles = await fetchCatalogTitles(items, authToken, "graphql");
-        return titles.length ? titles : null;
-      },
-    },
-  ];
-
-  for (const q of queries) {
-    info(`GraphQL query: ${q.name}`);
-    const resp = await fetch(GQL_URL, { method: "POST", headers, body: q.body, credentials: "include" });
-    info(`GraphQL HTTP status (${q.name})`, resp.status);
-    if (resp.status === 401 || resp.status === 403) {
-      throw new Error(`HTTP ${resp.status}: Not authenticated — ensure you are logged in to the Epic Store`);
-    }
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => "");
-      info(`GraphQL non-ok (${q.name}), trying next`, text.slice(0, 200));
-      continue;
-    }
-    const json = await resp.json();
-    if (json.errors) {
-      info(`GraphQL errors (${q.name})`, json.errors.map(e => e.message).join("; "));
-      continue;
-    }
-    const titles = await q.extract(json);
-    if (titles === null) {
-      info(`GraphQL unexpected shape (${q.name})`, json?.data);
-      continue;
-    }
-    info(`GraphQL OK via ${q.name} — ${titles.length} titles`);
-    return titles;
-  }
-  throw new Error("All GraphQL queries returned no data");
-}
-
-// ── Method 2: Account assets API ─────────────────────────────────────────
-async function fetchViaAssetsAPI(authToken) {
-  const URL = "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/public/assets/Windows?label=Live";
-  info("Method 2: Assets API", URL);
-
-  const resp = await fetch(URL, { headers: authHeaders(authToken) });
-  info(`Assets API HTTP status`, resp.status);
-  if (resp.status === 401 || resp.status === 403) {
-    throw new Error(`HTTP ${resp.status}: Not authenticated — this endpoint requires a launcher token`);
-  }
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`HTTP ${resp.status}: ${text.slice(0, 200)}`);
-  }
-  const json = await resp.json();
-  if (!Array.isArray(json)) throw new Error(`Expected array, got ${typeof json}`);
-  const names = json.map(a => a.appName).filter(Boolean);
-  info(`Assets API OK — ${names.length} entries`);
-  return names;
-}
-
-// ── Method 3: Library service API ────────────────────────────────────────
+// ── Library service API ───────────────────────────────────────────────────
 async function fetchViaLibraryAPI(authToken) {
   const BASE = "https://library-service.live.use1a.on.epicgames.com/library/api/public/items";
   info("Method 3: Library Service API", BASE);
@@ -471,8 +383,6 @@ async function doScan(authFromPage, accountIdFromPage) {
 
   const methods = [
     { name: "Library Service API", fn: () => fetchViaLibraryAPI(authToken) },
-    { name: "GraphQL API",         fn: () => fetchViaGraphQL(authToken) },
-    { name: "Assets API",          fn: () => fetchViaAssetsAPI(authToken) },
   ];
 
   for (const method of methods) {

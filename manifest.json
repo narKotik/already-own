@@ -13,10 +13,7 @@
     "https://store.epicgames.com/*",
     "https://store.steampowered.com/*",
     "https://www.epicgames.com/*",
-    "https://graphql.epicgames.com/*",
-    "https://launcher-public-service-prod06.ol.epicgames.com/*",
     "https://library-service.live.use1a.on.epicgames.com/*",
-    "https://account-public-service-prod.ol.epicgames.com/*",
     "https://catalog-public-service-prod06.ol.epicgames.com/*",
     "https://steamcommunity.com/*",
     "https://api.steampowered.com/*"
