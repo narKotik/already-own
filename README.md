@@ -13,7 +13,10 @@ If you find it useful: [☕ Buy me a coffee](https://ko-fi.com/aleadyown)
 - **📥 Export / Import** — Back up and restore your library as a JSON file
 - **🔒 100% Local** — All data stored on your device via `chrome.storage.local`. No servers, no tracking.
 
-## Installation (Developer Mode)
+## Plugin is published so you can get it directly from the Chrome Web Store by link
+https://chromewebstore.google.com/detail/already-own/ioelkjobebpdbndlmeebgmbfknbhnknj?hl=en&authuser=0
+
+## Manual installation (Developer Mode)
 
 1. Clone or download this repo
 2. Open Chrome and go to `chrome://extensions/`
@@ -24,18 +27,12 @@ If you find it useful: [☕ Buy me a coffee](https://ko-fi.com/aleadyown)
 ## How to Use
 
 ### Scan your Epic library
-1. Open [store.epicgames.com](https://store.epicgames.com) and sign in
-2. Navigate to your library and scroll to the bottom (Epic lazy-loads)
-3. Open the extension popup → **Scan** tab → click **Scan Epic Library**
+1. Open extension and click on Open Epic store & scan and sign in into your account
+2. Open the extension popup → **Scan** tab → click **Scan Epic Library**
 
 ### Scan your Steam library
-1. Open [store.steampowered.com](https://store.steampowered.com) and sign in
-2. Open the extension popup → **Scan** tab → click **Scan Steam Library**
-3. The extension opens your Steam Community games page in a background tab, scrolls through the full list, and closes it automatically
-
-> **Note:** Scanning your Steam library opens a temporary background tab on `steamcommunity.com`. If your Steam profile games list is set to **private**, the scan will fall back to a slower Steam API method. Make sure your game details are set to public for best results.
-
-> **Warning:** Running Steam store scans very frequently (the slower API fallback path) may result in a temporary block on `store.steampowered.com/api/appdetails` requests. If badge lookups on Steam stop working, wait a few minutes for the block to lift.
+1. Open extension and click on Open Steam & scan and sign in into your account
+2. The extension opens your Steam Community games page in a background tab, scrolls through the full list, and closes it automatically
 
 ### Browse stores
 Visit any game page on `store.steampowered.com/app/…` or `store.epicgames.com/p/…`. If you own the game in your other library, a badge appears above the buy button automatically.
@@ -92,9 +89,8 @@ Enable **Debug logs** (checkbox at the bottom of the popup), run a scan, then op
 
 - **DLC appears as separate entries** — Epic's API returns DLC packs as individual items, so your count will often be higher than the base game count in the launcher. Use the ignore list to hide DLC.
 - **Private Steam profile** — if your Steam games list is private, the fast profile-page scan falls back to the slower `appdetails` API, which is rate-limited.
-- **Steam scan rate limit** — the `appdetails` API fallback (used when the profile page is private) is rate-limited by Steam. Scanning too frequently may temporarily block those requests. If Steam store pages stop loading correctly, wait a few minutes.
+- **Steam scan rate limit** — the `appdetails` API fallback is rate-limited by Steam. Scanning too frequently may temporarily block those requests. If Steam store pages stop loading correctly, wait a few minutes.
 - **Title mismatches** — games with very different names on Epic vs Steam (regional differences, publisher renames) may not match.
-- **Epic lazy-loading** — scroll to the bottom of your Epic library before scanning so all titles are loaded into the page.
 
 ## Privacy
 
