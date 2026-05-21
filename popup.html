@@ -43,7 +43,7 @@
 
     /* Tabs */
     .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); }
-    .tab { flex: 1; padding: 9px 4px; text-align: center; font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; letter-spacing: .03em; text-transform: uppercase; }
+    .tab { flex: 1; padding: 9px 4px; text-align: center; font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
     .tab:hover { color: var(--text); }
     .tab.active { color: var(--epic); border-bottom-color: var(--epic); }
 
@@ -131,10 +131,27 @@
     .log-entry.error { color:var(--red);    background:rgba(248,81,73,.07); }
     .log-time { color:var(--muted); margin-right:5px; }
 
+    /* Settings panel */
+    .settings-section { background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:10px 13px; display:flex; flex-direction:column; gap:8px; }
+    .settings-hdr { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; padding-bottom:4px; border-bottom:1px solid var(--border); }
+    .settings-check { display:flex; align-items:flex-start; gap:9px; cursor:pointer; padding:1px 0; }
+    .settings-check input[type="checkbox"] { accent-color:var(--epic); margin-top:2px; cursor:pointer; flex-shrink:0; }
+    .settings-check-text { display:flex; flex-direction:column; gap:1px; }
+    .settings-check-label { font-size:12px; color:var(--text); }
+    .settings-hint { font-size:10px; color:var(--muted); line-height:1.4; }
+    .settings-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .settings-row-label { font-size:12px; color:var(--text); }
+    .settings-select { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:4px 7px; color:var(--text); font-size:11px; font-family:inherit; outline:none; cursor:pointer; max-width:160px; }
+    .settings-select:focus { border-color:var(--epic); }
+    .btn-danger-sm { padding:6px 10px; border-radius:6px; background:none; color:var(--red); border:1px solid rgba(248,81,73,.3); font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; text-align:left; transition:all .15s; width:100%; }
+    .btn-danger-sm:hover { background:rgba(248,81,73,.1); border-color:var(--red); }
+    .settings-confirm { display:none; flex-direction:column; gap:7px; padding:8px 10px; background:rgba(248,81,73,.08); border:1px solid rgba(248,81,73,.25); border-radius:6px; }
+    .settings-confirm.visible { display:flex; }
+    .settings-confirm-msg { font-size:11px; color:var(--red); }
+    .settings-confirm-btns { display:flex; gap:6px; }
+
     .footer { border-top:1px solid var(--border); padding:7px 14px; font-size:10px; color:var(--muted); text-align:center; }
     .footer a { color:var(--epic); text-decoration:none; }
-    .debug-toggle { cursor:pointer; color:var(--muted); font-size:9px; }
-    .debug-toggle input { accent-color:var(--epic); cursor:pointer; vertical-align:middle; margin-right:2px; }
   </style>
 </head>
 <body>
@@ -143,40 +160,41 @@
   <img class="header-logo" src="icons/icon48.png" alt="">
   <div>
     <div class="header-name">Already Own?</div>
-    <div class="header-sub">Epic &amp; Steam ownership checker</div>
+    <div class="header-sub" data-i18n="header_sub">Epic &amp; Steam ownership checker</div>
   </div>
-  <div class="header-ver">v1.4.2</div>
+  <div class="header-ver">v1.5.0</div>
 </div>
 
 <div class="tabs">
-  <div class="tab active" data-tab="library">📚 Library</div>
-  <div class="tab" data-tab="scan">🎮 Scan</div>
-  <div class="tab" data-tab="logs" id="tab-btn-logs" style="display:none;">🔍 Logs</div>
+  <div class="tab active" data-tab="library">📚 <span data-i18n="tab_library">Library</span></div>
+  <div class="tab" data-tab="scan">🎮 <span data-i18n="tab_scan">Scan</span></div>
+  <div class="tab" data-tab="settings">⚙️ <span data-i18n="tab_settings">Settings</span></div>
+  <div class="tab" data-tab="logs" id="tab-btn-logs" style="display:none;">🔍 <span data-i18n="tab_logs">Logs</span></div>
 </div>
 
 <!-- LIBRARY TAB -->
 <div class="panel active" id="tab-library">
   <div class="lib-toolbar">
     <div class="lib-search-wrap">
-      <input class="lib-search" id="lib-search" placeholder="Search games…" autocomplete="off" />
-      <button class="lib-search-clear" id="lib-search-clear" title="Clear search">✕</button>
+      <input class="lib-search" id="lib-search" data-i18n-ph="lib_search_ph" placeholder="Search games…" autocomplete="off" />
+      <button class="lib-search-clear" id="lib-search-clear" title="✕">✕</button>
     </div>
   </div>
   <div class="games-list-wrap">
     <div id="games-list"><div class="empty-state">No games saved yet.<br>Go to Scan tab to import your library.</div></div>
   </div>
   <div class="clear-confirm" id="clear-confirm">
-    <span>Delete all saved games?</span>
-    <button class="btn-confirm-yes" id="btn-clear-yes">Yes</button>
-    <button class="btn-confirm-no"  id="btn-clear-no">Cancel</button>
+    <span data-i18n="lib_delete_confirm">Delete all saved games?</span>
+    <button class="btn-confirm-yes" id="btn-clear-yes" data-i18n="btn_yes">Yes</button>
+    <button class="btn-confirm-no"  id="btn-clear-no"  data-i18n="btn_cancel">Cancel</button>
   </div>
   <div class="lib-footer">
     <span class="lib-count" id="lib-count">0 games</span>
-    <button class="btn-clear-lib" id="btn-clear">Clear all</button>
+    <button class="btn-clear-lib" id="btn-clear" data-i18n="lib_clear_all">Clear all</button>
   </div>
   <div id="ignored-toggle-row" style="display:none;">
     <button class="btn-ignored-toggle" id="btn-ignored-toggle">
-      <span>Ignored games (<span id="ignored-count">0</span>)</span>
+      <span id="ignored-header-text">Ignored games (<span id="ignored-count">0</span>)</span>
       <span id="ignored-chevron">▸</span>
     </button>
   </div>
@@ -184,11 +202,11 @@
     <div class="games-list-wrap" style="max-height:150px;">
       <div id="ignored-list"></div>
     </div>
-    <div class="ignored-hint">Ignored games are skipped on future scans.<br>↩ restore to library &nbsp;·&nbsp; ✕ remove from this list (may return on next scan)</div>
+    <div class="ignored-hint" id="ignored-hint-text">Ignored games are skipped on future scans.<br>↩ restore to library &nbsp;·&nbsp; ✕ remove from this list (may return on next scan)</div>
   </div>
   <div id="dismissed-toggle-row" style="display:none; border-top:1px solid var(--border); padding-top:4px;">
     <button class="btn-ignored-toggle" id="btn-dismissed-toggle">
-      <span>Dismissed matches (<span id="dismissed-count">0</span>)</span>
+      <span id="dismissed-header-text">Dismissed matches (<span id="dismissed-count">0</span>)</span>
       <span id="dismissed-chevron">▸</span>
     </button>
   </div>
@@ -196,59 +214,154 @@
     <div class="games-list-wrap" style="max-height:150px;">
       <div id="dismissed-list"></div>
     </div>
-    <div class="ignored-hint">Pages where you clicked ✕ on the badge.<br>↩ restore to show the badge again on that page</div>
+    <div class="ignored-hint" id="dismissed-hint-text">Pages where you clicked ✕ on the badge.<br>↩ restore to show the badge again on that page</div>
   </div>
 </div>
 
 <!-- SCAN TAB -->
 <div class="panel" id="tab-scan">
   <div class="lib-add-row">
-    <input class="lib-add-input" id="lib-add-input" placeholder="Add game manually…" autocomplete="off" />
+    <input class="lib-add-input" id="lib-add-input" data-i18n-ph="scan_add_ph" placeholder="Add game manually…" autocomplete="off" />
     <select class="lib-add-source" id="lib-add-source">
-      <option value="epic">Epic</option>
-      <option value="steam">Steam</option>
-      <option value="other" selected>Other</option>
+      <option value="epic"  data-i18n="src_epic">Epic</option>
+      <option value="steam" data-i18n="src_steam">Steam</option>
+      <option value="other" selected data-i18n="src_other">Other</option>
     </select>
-    <button class="btn-add" id="btn-add-game">+ Add</button>
+    <button class="btn-add" id="btn-add-game" data-i18n="btn_add">+ Add</button>
   </div>
   <div class="step">
-    <div class="step-header"><div class="step-num">1</div><div class="step-title">Scan Epic Library</div></div>
+    <div class="step-header"><div class="step-num">1</div><div class="step-title" data-i18n="scan_epic_title">Scan Epic Library</div></div>
     <div class="step-desc" id="scan-desc">Checking Epic session…</div>
     <button class="btn btn-primary" id="btn-scan" disabled>
       <div class="spinner" id="scan-spinner"></div>
       <span id="scan-label">…</span>
     </button>
-    <div class="scan-meta">Last scan: <span id="stat-scan">—</span></div>
+    <div class="scan-meta"><span data-i18n="scan_last">Last scan:</span> <span id="stat-scan">—</span></div>
   </div>
   <div class="step">
-    <div class="step-header"><div class="step-num">2</div><div class="step-title">Scan Steam Library</div></div>
+    <div class="step-header"><div class="step-num">2</div><div class="step-title" data-i18n="scan_steam_title">Scan Steam Library</div></div>
     <div class="step-desc" id="steam-scan-desc">Checking Steam session…</div>
     <button class="btn btn-primary" id="btn-steam-scan" disabled>
       <div class="spinner" id="steam-spinner"></div>
       <span id="steam-label">…</span>
     </button>
-    <div class="scan-meta">Last scan: <span id="stat-steam-scan">—</span></div>
+    <div class="scan-meta"><span data-i18n="scan_last">Last scan:</span> <span id="stat-steam-scan">—</span></div>
   </div>
   <div id="status"></div>
   <div class="lib-actions">
-    <button class="btn-lib-io" id="btn-export">↑ Export library</button>
-    <button class="btn-lib-io" id="btn-import">↓ Import library</button>
+    <button class="btn-lib-io" id="btn-export" data-i18n="btn_export">↑ Export library</button>
+    <button class="btn-lib-io" id="btn-import" data-i18n="btn_import">↓ Import library</button>
   </div>
   <div id="lib-io-status"></div>
+</div>
+
+<!-- SETTINGS TAB -->
+<div class="panel" id="tab-settings">
+  <!-- Badge matching -->
+  <div class="settings-section">
+    <div class="settings-hdr" data-i18n="settings_matching">Badge matching</div>
+    <label class="settings-check">
+      <input type="checkbox" id="chk-match-exact" checked>
+      <span class="settings-check-text">
+        <span class="settings-check-label" data-i18n="settings_match_exact">Exact match</span>
+        <span class="settings-hint" data-i18n="settings_match_exact_hint">Normalized titles are identical</span>
+      </span>
+    </label>
+    <label class="settings-check">
+      <input type="checkbox" id="chk-match-partial" checked>
+      <span class="settings-check-text">
+        <span class="settings-check-label" data-i18n="settings_match_partial">Partial match</span>
+        <span class="settings-hint" data-i18n="settings_match_partial_hint">One title contains the other</span>
+      </span>
+    </label>
+    <label class="settings-check">
+      <input type="checkbox" id="chk-match-fuzzy" checked>
+      <span class="settings-check-text">
+        <span class="settings-check-label" data-i18n="settings_match_fuzzy">Fuzzy match</span>
+        <span class="settings-hint" data-i18n="settings_match_fuzzy_hint">≥75% word overlap</span>
+      </span>
+    </label>
+  </div>
+
+  <!-- Language -->
+  <div class="settings-section">
+    <div class="settings-hdr" data-i18n="settings_language">Language</div>
+    <div class="settings-row">
+      <label class="settings-row-label" for="sel-ui-locale" data-i18n="settings_ui_locale">Display language</label>
+      <select class="settings-select" id="sel-ui-locale">
+        <option value="en-US">English (US)</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="es-419">Español (Latinoamérica)</option>
+        <option value="pl">Polski</option>
+        <option value="tr">Türkçe</option>
+        <option value="uk">Українська</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <label class="settings-row-label" for="sel-req-locale" data-i18n="settings_req_locale">API request language</label>
+      <select class="settings-select" id="sel-req-locale">
+        <option value="en-US">English (US)</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="es-419">Español</option>
+        <option value="pl">Polski</option>
+        <option value="tr">Türkçe</option>
+        <option value="uk">Українська</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="settings-section">
+    <div class="settings-hdr" data-i18n="settings_notifications">Notifications</div>
+    <label class="settings-check">
+      <input type="checkbox" id="chk-show-toasts" checked>
+      <span class="settings-check-text">
+        <span class="settings-check-label" data-i18n="settings_toasts">Show scan result notification</span>
+      </span>
+    </label>
+  </div>
+
+  <!-- Debug -->
+  <div class="settings-section">
+    <div class="settings-hdr" data-i18n="settings_debug_section">Debug</div>
+    <label class="settings-check">
+      <input type="checkbox" id="chk-debug-logs">
+      <span class="settings-check-text">
+        <span class="settings-check-label" data-i18n="settings_debug_logs">Show Logs tab</span>
+      </span>
+    </label>
+  </div>
+
+  <!-- Clear data -->
+  <div class="settings-section">
+    <div class="settings-hdr" data-i18n="settings_clear_section">Clear data</div>
+    <button class="btn-danger-sm" id="btn-clr-dismissed" data-i18n="settings_clear_dismissed">Clear dismissed badges</button>
+    <button class="btn-danger-sm" id="btn-clr-ignored" data-i18n="settings_clear_ignored">Clear ignored games</button>
+    <button class="btn-danger-sm" id="btn-clr-library" data-i18n="settings_clear_library">Clear all library data</button>
+    <div class="settings-confirm" id="settings-confirm">
+      <span class="settings-confirm-msg" data-i18n="settings_confirm">Are you sure? This cannot be undone.</span>
+      <div class="settings-confirm-btns">
+        <button class="btn-confirm-yes" id="btn-s-confirm-yes" data-i18n="btn_yes">Yes</button>
+        <button class="btn-confirm-no"  id="btn-s-confirm-no"  data-i18n="btn_cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- LOGS TAB -->
 <div class="panel" id="tab-logs">
   <div class="log-toolbar">
-    <span style="font-size:11px;color:var(--muted);flex:1">Scan diagnostics</span>
-    <button class="btn-copy-log" id="btn-copy-log">Copy</button>
-    <button class="btn-clear-log" id="btn-clear-log">Clear</button>
+    <span style="font-size:11px;color:var(--muted);flex:1" data-i18n="logs_title">Scan diagnostics</span>
+    <button class="btn-copy-log" id="btn-copy-log" data-i18n="logs_copy">Copy</button>
+    <button class="btn-clear-log" id="btn-clear-log" data-i18n="logs_clear">Clear</button>
   </div>
-  <div id="log-container"><div class="log-empty">No logs yet — run a scan first.</div></div>
+  <div id="log-container"><div class="log-empty" data-i18n="logs_empty">No logs yet — run a scan first.</div></div>
 </div>
 
 <div class="footer">
-  Matching by title similarity &nbsp;·&nbsp; <a href="https://github.com/narKotik/already-own" target="_blank">GitHub ↗</a> &nbsp;·&nbsp; <a href="https://ko-fi.com/aleadyown" target="_blank">Buy me a coffee ☕</a> &nbsp;·&nbsp; <label class="debug-toggle"><input type="checkbox" id="chk-debug-logs">Debug logs</label>
+  <span data-i18n="footer_info">Matching by title similarity</span> &nbsp;·&nbsp;
+  <a href="https://github.com/narKotik/already-own" target="_blank">GitHub ↗</a> &nbsp;·&nbsp;
+  <a href="https://ko-fi.com/aleadyown" target="_blank">Buy me a coffee ☕</a>
 </div>
 
 <script src="popup.js"></script>

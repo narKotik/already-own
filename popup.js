@@ -1,9 +1,17 @@
-// popup.js v1.4.0
+// popup.js v1.5.0
 
-const LIBRARY_KEY    = "elsLibrary";
-const IGNORE_KEY     = "elsIgnoredGames";
-const DISMISSED_KEY  = "epicDismissedMatches";
+const LIBRARY_KEY   = "elsLibrary";
+const IGNORE_KEY    = "elsIgnoredGames";
+const DISMISSED_KEY = "epicDismissedMatches";
+const SETTINGS_KEY  = "elsSettings";
 
+const DEFAULT_SETTINGS = {
+  matchExact: true, matchPartial: true, matchFuzzy: true,
+  uiLocale: "en-US", requestLocale: "en-US",
+  showToasts: true, debugLogs: false,
+};
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
 const btnScan        = document.getElementById("btn-scan");
 const btnSteamScan   = document.getElementById("btn-steam-scan");
 const btnClear       = document.getElementById("btn-clear");
@@ -23,32 +31,94 @@ const libSearch      = document.getElementById("lib-search");
 const libAddInput    = document.getElementById("lib-add-input");
 const libAddSource   = document.getElementById("lib-add-source");
 const logContainer   = document.getElementById("log-container");
-const chkDebugLogs   = document.getElementById("chk-debug-logs");
 const libSearchClear = document.getElementById("lib-search-clear");
 const btnExport      = document.getElementById("btn-export");
 const btnImport      = document.getElementById("btn-import");
 const libIoStatus    = document.getElementById("lib-io-status");
 const scanDesc       = document.getElementById("scan-desc");
 const steamScanDesc  = document.getElementById("steam-scan-desc");
+// Settings refs
+const chkMatchExact   = document.getElementById("chk-match-exact");
+const chkMatchPartial = document.getElementById("chk-match-partial");
+const chkMatchFuzzy   = document.getElementById("chk-match-fuzzy");
+const chkShowToasts   = document.getElementById("chk-show-toasts");
+const chkDebugLogs    = document.getElementById("chk-debug-logs");
+const selUiLocale     = document.getElementById("sel-ui-locale");
+const selReqLocale    = document.getElementById("sel-req-locale");
 
-let allGames     = [];  // [{title, source}]
-let allIgnored   = [];  // [{title, source}]
+// ── State ─────────────────────────────────────────────────────────────────
+let i18n = {};
+let currentSettings = { ...DEFAULT_SETTINGS };
+let allGames     = [];
+let allIgnored   = [];
 let allDismissed = [];
 let storedLogs   = [];
 let hasAuth      = false;
 let hasSteamAuth = false;
 let initialLoad  = true;
 
-const normKey     = s => s.replace(/[™®©]/g, "").toLowerCase().trim();
+const normKey      = s => s.replace(/[™®©]/g, "").toLowerCase().trim();
 const preferRicher = (a, b) => (/[™®©]/.test(b) && !/[™®©]/.test(a)) ? b : a;
 
-function deduplicateList(arr) {
-  const seen = new Map();
-  for (const g of arr) {
-    const k = normKey(g.title) + ":" + g.source;
-    seen.set(k, seen.has(k) ? { ...g, title: preferRicher(seen.get(k).title, g.title) } : g);
+// ── i18n ──────────────────────────────────────────────────────────────────
+async function loadI18n(locale) {
+  try {
+    const url = chrome.runtime.getURL(`locales/${locale}.json`);
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(r.status);
+    i18n = await r.json();
+  } catch {
+    if (locale !== "en-US") {
+      try {
+        const url = chrome.runtime.getURL("locales/en-US.json");
+        i18n = await fetch(url).then(r => r.json());
+      } catch { i18n = {}; }
+    }
   }
-  return [...seen.values()];
+}
+
+function t(key, vars = {}) {
+  let s = i18n[key] ?? key;
+  for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v));
+  return s;
+}
+
+function applyI18n() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => {
+    el.placeholder = t(el.dataset.i18nPh);
+  });
+  // Update dynamic text that depends on current state
+  document.getElementById("ignored-hint-text").textContent = t("lib_ignored_hint");
+  document.getElementById("dismissed-hint-text").textContent = t("lib_dismissed_hint");
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────
+async function loadSettings() {
+  const raw = await new Promise(r => chrome.storage.local.get([SETTINGS_KEY, "epicDebugLogs"], r));
+  const stored = raw[SETTINGS_KEY] ?? {};
+  // Migrate old epicDebugLogs key
+  if (raw.epicDebugLogs !== undefined && stored.debugLogs === undefined) {
+    stored.debugLogs = !!raw.epicDebugLogs;
+  }
+  currentSettings = { ...DEFAULT_SETTINGS, ...stored };
+  return currentSettings;
+}
+
+function saveSettings() {
+  chrome.storage.local.set({ [SETTINGS_KEY]: currentSettings });
+}
+
+function applySettingsToUI(s) {
+  chkMatchExact.checked   = s.matchExact;
+  chkMatchPartial.checked = s.matchPartial;
+  chkMatchFuzzy.checked   = s.matchFuzzy;
+  chkShowToasts.checked   = s.showToasts;
+  chkDebugLogs.checked    = s.debugLogs;
+  selUiLocale.value       = s.uiLocale;
+  selReqLocale.value      = s.requestLocale;
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
@@ -62,19 +132,29 @@ document.querySelectorAll(".tab").forEach(tab => {
 });
 
 function switchTab(name) {
-  document.querySelector(`[data-tab="${name}"]`).click();
+  const btn = document.querySelector(`[data-tab="${name}"]`);
+  if (btn) btn.click();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function setStatus(msg, type = "") { statusEl.textContent = msg; statusEl.className = type; }
 
 function timeAgo(ts) {
-  if (!ts) return "—";
+  if (!ts) return t("scan_never");
   const d = Math.floor((Date.now() - ts) / 1000);
-  if (d < 60) return "just now";
-  if (d < 3600) return `${Math.floor(d/60)}m ago`;
-  if (d < 86400) return `${Math.floor(d/3600)}h ago`;
-  return `${Math.floor(d/86400)}d ago`;
+  if (d < 60)    return t("time_now");
+  if (d < 3600)  return t("time_min", { n: Math.floor(d / 60) });
+  if (d < 86400) return t("time_hr",  { n: Math.floor(d / 3600) });
+  return t("time_day", { n: Math.floor(d / 86400) });
+}
+
+function deduplicateList(arr) {
+  const seen = new Map();
+  for (const g of arr) {
+    const k = normKey(g.title) + ":" + g.source;
+    seen.set(k, seen.has(k) ? { ...g, title: preferRicher(seen.get(k).title, g.title) } : g);
+  }
+  return [...seen.values()];
 }
 
 // ── Library ───────────────────────────────────────────────────────────────
@@ -104,14 +184,22 @@ function renderLibrary(filter = "") {
   const q = filter.toLowerCase().trim();
   const filtered = q ? allGames.filter(g => g.title.toLowerCase().includes(q)) : allGames;
   const sorted = filtered.slice().sort((a, b) => a.title.localeCompare(b.title));
-  libCount.textContent = `${allGames.length} game${allGames.length !== 1 ? "s" : ""}`;
+  libCount.textContent = allGames.length === 1 ? t("lib_count_1", { n: 1 }) : t("lib_count", { n: allGames.length });
 
   if (allGames.length === 0) {
-    gamesList.innerHTML = `<div class="empty-state">No games saved yet.<br>Go to Scan tab to import your library.</div>`;
+    const el = document.createElement("div");
+    el.className = "empty-state";
+    el.textContent = t("lib_empty");
+    gamesList.innerHTML = "";
+    gamesList.appendChild(el);
     return;
   }
   if (sorted.length === 0) {
-    gamesList.innerHTML = `<div class="empty-state">No games match "${filter}"</div>`;
+    const el = document.createElement("div");
+    el.className = "empty-state";
+    el.textContent = t("lib_empty_filter", { q: filter });
+    gamesList.innerHTML = "";
+    gamesList.appendChild(el);
     return;
   }
   gamesList.innerHTML = "";
@@ -120,14 +208,14 @@ function renderLibrary(filter = "") {
     item.className = "game-item";
     const badge = document.createElement("span");
     badge.className = `src-badge src-${g.source}`;
-    badge.textContent = g.source;
+    badge.textContent = t(`src_${g.source}`) !== `src_${g.source}` ? t(`src_${g.source}`) : g.source;
     const name = document.createElement("span");
     name.className = "game-name";
     name.title = g.title;
     name.textContent = g.title;
     const ign = document.createElement("button");
     ign.className = "game-ignore";
-    ign.title = "Move to ignore list";
+    ign.title = t("lib_ignore_title");
     ign.textContent = "✕";
     ign.addEventListener("click", () => ignoreGame(g));
     item.append(badge, name, ign);
@@ -139,10 +227,16 @@ function renderIgnored() {
   const toggleRow = document.getElementById("ignored-toggle-row");
   const section   = document.getElementById("ignored-section");
   const countEl   = document.getElementById("ignored-count");
+  const headerText = document.getElementById("ignored-header-text");
   const chevron   = document.getElementById("ignored-chevron");
   const list      = document.getElementById("ignored-list");
 
   countEl.textContent = allIgnored.length;
+  // rebuild header text with translated label
+  headerText.textContent = "";
+  const labelSpan = document.createElement("span");
+  labelSpan.textContent = t("lib_ignored_header", { n: allIgnored.length });
+  headerText.appendChild(labelSpan);
 
   if (allIgnored.length === 0) {
     toggleRow.style.display = "none";
@@ -160,19 +254,19 @@ function renderIgnored() {
     dot.className = "game-dot-muted";
     const badge = document.createElement("span");
     badge.className = `src-badge src-${g.source}`;
-    badge.textContent = g.source;
+    badge.textContent = t(`src_${g.source}`) !== `src_${g.source}` ? t(`src_${g.source}`) : g.source;
     const name = document.createElement("span");
     name.className = "game-name";
     name.title = g.title;
     name.textContent = g.title;
     const restore = document.createElement("button");
     restore.className = "game-restore";
-    restore.title = "Restore to library";
+    restore.title = t("lib_restore_title");
     restore.textContent = "↩";
     restore.addEventListener("click", () => restoreGame(g));
     const del = document.createElement("button");
     del.className = "game-del";
-    del.title = "Remove from ignore list";
+    del.title = t("lib_delete_title");
     del.textContent = "✕";
     del.addEventListener("click", () => deleteFromIgnored(g));
     item.append(dot, badge, name, restore, del);
@@ -192,9 +286,15 @@ function renderDismissed() {
   const toggleRow = document.getElementById("dismissed-toggle-row");
   const section   = document.getElementById("dismissed-section");
   const countEl   = document.getElementById("dismissed-count");
+  const headerText = document.getElementById("dismissed-header-text");
   const list      = document.getElementById("dismissed-list");
 
   countEl.textContent = allDismissed.length;
+  headerText.textContent = "";
+  const labelSpan = document.createElement("span");
+  labelSpan.textContent = t("lib_dismissed_header", { n: allDismissed.length });
+  headerText.appendChild(labelSpan);
+
   if (allDismissed.length === 0) {
     toggleRow.style.display = "none";
     section.style.display   = "none";
@@ -223,7 +323,7 @@ function renderDismissed() {
     name.textContent = `${pageTitle}  ·  ${matchedTitle}`;
     const restore = document.createElement("button");
     restore.className = "game-restore";
-    restore.title = "Restore badge for this page";
+    restore.title = t("lib_undismiss_title");
     restore.textContent = "↩";
     restore.addEventListener("click", () => undismiss(pageId, matchedTitle));
     item.append(dot, name, restore);
@@ -275,7 +375,6 @@ function addGame() {
   const source = libAddSource.value;
   const lower = normKey(name);
   if (allGames.some(x => normKey(x.title) === lower && x.source === source)) { libAddInput.value = ""; return; }
-  // If already ignored with same title+source, restore it instead of adding a duplicate
   if (allIgnored.some(x => normKey(x.title) === lower && x.source === source)) {
     allIgnored = allIgnored.filter(x => !(normKey(x.title) === lower && x.source === source));
     allGames.push({ title: name, source });
@@ -322,10 +421,9 @@ btnExport.addEventListener("click", () => {
   a.download = `epic-library-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  setLibStatus(`Exported ${allGames.length} games, ${allIgnored.length} ignored`);
+  setLibStatus(t("export_done", { n: allGames.length, i: allIgnored.length }));
 });
 
-// Import opens a dedicated tab so the OS file-picker doesn't close the extension popup.
 btnImport.addEventListener("click", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("importer.html") });
 });
@@ -333,7 +431,11 @@ btnImport.addEventListener("click", () => {
 // ── Logs ──────────────────────────────────────────────────────────────────
 function renderLogs(logs) {
   if (!logs || logs.length === 0) {
-    logContainer.innerHTML = `<div class="log-empty">No logs yet — run a scan first.</div>`;
+    const el = document.createElement("div");
+    el.className = "log-empty";
+    el.textContent = t("logs_empty");
+    logContainer.innerHTML = "";
+    logContainer.appendChild(el);
     return;
   }
   const box = document.createElement("div");
@@ -355,12 +457,25 @@ btnCopyLog.addEventListener("click", () => {
     `[${e.time}] [${e.level.toUpperCase()}] ${e.msg}${e.data ? " → " + e.data : ""}`
   ).join("\n");
   navigator.clipboard.writeText(text || "(no logs)").then(() => {
-    btnCopyLog.textContent = "Copied!";
-    setTimeout(() => { btnCopyLog.textContent = "Copy"; }, 1500);
+    btnCopyLog.textContent = t("logs_copied");
+    setTimeout(() => { btnCopyLog.textContent = t("logs_copy"); }, 1500);
   });
 });
 
 btnClearLog.addEventListener("click", () => { storedLogs = []; renderLogs([]); });
+
+// ── Debug / Logs tab ──────────────────────────────────────────────────────
+function applyDebugState(enabled) {
+  const logsTabBtn = document.getElementById("tab-btn-logs");
+  logsTabBtn.style.display = enabled ? "" : "none";
+  if (!enabled && logsTabBtn.classList.contains("active")) switchTab("library");
+}
+
+chkDebugLogs.addEventListener("change", () => {
+  currentSettings.debugLogs = chkDebugLogs.checked;
+  saveSettings();
+  applyDebugState(chkDebugLogs.checked);
+});
 
 // ── Epic scan ─────────────────────────────────────────────────────────────
 function setAuthState(auth) {
@@ -368,53 +483,46 @@ function setAuthState(auth) {
   btnScan.disabled = false;
   scanSpinner.style.display = "none";
   if (auth) {
-    scanLabel.textContent = "🎮 Scan Epic Library";
-    scanDesc.textContent = "Reads your owned games from Epic's API using your browser session.";
+    scanLabel.textContent = t("scan_epic_btn");
+    scanDesc.textContent  = t("scan_epic_ready");
     scanDesc.classList.remove("warn");
   } else {
-    scanLabel.textContent = "🔗 Open Epic Store & Scan";
-    scanDesc.textContent = "You're not signed in to Epic. Click to open the store, sign in, then scan.";
+    scanLabel.textContent = t("scan_epic_btn_noauth");
+    scanDesc.textContent  = t("scan_epic_noauth");
     scanDesc.classList.add("warn");
   }
 }
 
-chrome.runtime.sendMessage({ action: "checkAuth" }, (r) => setAuthState(!!r?.hasAuth));
-
 btnScan.addEventListener("click", () => {
   if (!hasAuth) {
     chrome.tabs.create({ url: "https://store.epicgames.com" });
-    setStatus("Sign in to Epic, then reopen this popup and click Scan.", "warn");
-    scanDesc.textContent = "Sign in to Epic in the tab that just opened, then come back here and click Scan.";
+    setStatus(t("sign_in_epic"), "warn");
+    scanDesc.textContent = t("sign_in_epic_desc");
     return;
   }
-
   btnScan.disabled = true;
   scanSpinner.style.display = "block";
-  scanLabel.textContent = "Scanning…";
+  scanLabel.textContent = t("scanning");
   setStatus("", "");
 
   chrome.runtime.sendMessage({ action: "doScan", authToken: null, accountId: null }, (response) => {
     if (chrome.runtime.lastError) {
       setAuthState(hasAuth);
-      setStatus("Extension error — try reloading.", "err");
+      setStatus(t("err_ext"), "err");
       return;
     }
     if (!response) {
       setAuthState(hasAuth);
-      setStatus("No response received.", "err");
+      setStatus(t("err_no_response"), "err");
       return;
     }
-
-    if (response.logs?.length) {
-      storedLogs = response.logs;
-      renderLogs(storedLogs);
-    }
+    if (response.logs?.length) { storedLogs = response.logs; renderLogs(storedLogs); }
 
     if (!response.success) {
       const authErr = response.error?.includes("401") || response.error?.includes("403") || response.error?.includes("authenticated");
       if (authErr) {
         setAuthState(false);
-        setStatus("Not signed in to Epic in Chrome — click the button to open the store and log in.", "warn");
+        setStatus(t("noauth_epic"), "warn");
       } else {
         setAuthState(true);
         setStatus(`❌ ${response.error}`, "err");
@@ -422,13 +530,12 @@ btnScan.addEventListener("click", () => {
       }
       return;
     }
-
     setAuthState(true);
     if (!response.games?.length) {
-      setStatus("⚠️ Scan ran but found 0 games — check Logs tab.", "warn");
+      setStatus(t("scan_zero_epic"), "warn");
       switchTab("logs");
     } else {
-      setStatus(`✅ ${response.total} Epic games saved (${response.added} new) via ${response.method}`, "ok");
+      setStatus(t("scan_ok_epic", { total: response.total, added: response.added, method: response.method }), "ok");
       loadData();
       switchTab("library");
     }
@@ -441,53 +548,46 @@ function setSteamAuthState(auth) {
   btnSteamScan.disabled = false;
   steamSpinner.style.display = "none";
   if (auth) {
-    steamLabel.textContent = "🎮 Scan Steam Library";
-    steamScanDesc.textContent = "Reads your owned games from Steam using your browser session.";
+    steamLabel.textContent    = t("scan_steam_btn");
+    steamScanDesc.textContent = t("scan_steam_ready");
     steamScanDesc.classList.remove("warn");
   } else {
-    steamLabel.textContent = "🔗 Open Steam & Scan";
-    steamScanDesc.textContent = "You're not signed in to Steam. Click to open the store, sign in, then scan.";
+    steamLabel.textContent    = t("scan_steam_btn_noauth");
+    steamScanDesc.textContent = t("scan_steam_noauth");
     steamScanDesc.classList.add("warn");
   }
 }
 
-chrome.runtime.sendMessage({ action: "checkSteamAuth" }, (r) => setSteamAuthState(!!r?.hasAuth));
-
 btnSteamScan.addEventListener("click", () => {
   if (!hasSteamAuth) {
     chrome.tabs.create({ url: "https://store.steampowered.com" });
-    setStatus("Sign in to Steam, then reopen this popup and click Scan.", "warn");
-    steamScanDesc.textContent = "Sign in to Steam in the tab that just opened, then come back here and click Scan.";
+    setStatus(t("sign_in_steam"), "warn");
+    steamScanDesc.textContent = t("sign_in_steam_desc");
     return;
   }
-
   btnSteamScan.disabled = true;
   steamSpinner.style.display = "block";
-  steamLabel.textContent = "Scanning…";
+  steamLabel.textContent = t("scanning");
   setStatus("", "");
 
   chrome.runtime.sendMessage({ action: "doSteamScan" }, (response) => {
     if (chrome.runtime.lastError) {
       setSteamAuthState(hasSteamAuth);
-      setStatus("Extension error — try reloading.", "err");
+      setStatus(t("err_ext"), "err");
       return;
     }
     if (!response) {
       setSteamAuthState(hasSteamAuth);
-      setStatus("No response received.", "err");
+      setStatus(t("err_no_response"), "err");
       return;
     }
-
-    if (response.logs?.length) {
-      storedLogs = response.logs;
-      renderLogs(storedLogs);
-    }
+    if (response.logs?.length) { storedLogs = response.logs; renderLogs(storedLogs); }
 
     if (!response.success) {
-      const notLoggedIn = response.error?.includes("Not logged") || response.error?.includes("not logged");
+      const notLoggedIn = response.error?.includes("Not logged") || response.error?.includes("not logged") || response.error?.includes("Not signed");
       if (notLoggedIn) {
         setSteamAuthState(false);
-        setStatus("Not signed in to Steam — click the button to open the store and log in.", "warn");
+        setStatus(t("noauth_steam"), "warn");
       } else {
         setSteamAuthState(true);
         setStatus(`❌ ${response.error}`, "err");
@@ -495,48 +595,111 @@ btnSteamScan.addEventListener("click", () => {
       }
       return;
     }
-
     setSteamAuthState(true);
     if (!response.games?.length) {
-      setStatus("⚠️ Steam scan ran but found 0 games — check Logs tab.", "warn");
+      setStatus(t("scan_zero_steam"), "warn");
       switchTab("logs");
     } else {
-      setStatus(`✅ ${response.total} Steam games saved (${response.added} new)`, "ok");
+      setStatus(t("scan_ok_steam", { total: response.total, added: response.added }), "ok");
       loadData();
       switchTab("library");
     }
   });
 });
 
-// ── Debug logs toggle (footer checkbox) ───────────────────────────────────
-function applyDebugState(enabled) {
-  const logsTabBtn = document.getElementById("tab-btn-logs");
-  logsTabBtn.style.display = enabled ? "" : "none";
-  if (!enabled && logsTabBtn.classList.contains("active")) switchTab("library");
-}
-
-chrome.storage.local.get("epicDebugLogs", (r) => {
-  const enabled = !!r.epicDebugLogs;
-  chkDebugLogs.checked = enabled;
-  applyDebugState(enabled);
+// ── Settings panel ────────────────────────────────────────────────────────
+[chkMatchExact, chkMatchPartial, chkMatchFuzzy].forEach(chk => {
+  chk.addEventListener("change", function () {
+    const anyChecked = chkMatchExact.checked || chkMatchPartial.checked || chkMatchFuzzy.checked;
+    if (!anyChecked) { this.checked = true; return; }
+    currentSettings.matchExact   = chkMatchExact.checked;
+    currentSettings.matchPartial = chkMatchPartial.checked;
+    currentSettings.matchFuzzy   = chkMatchFuzzy.checked;
+    saveSettings();
+  });
 });
 
-chkDebugLogs.addEventListener("change", () => {
-  const enabled = chkDebugLogs.checked;
-  chrome.storage.local.set({ epicDebugLogs: enabled });
-  applyDebugState(enabled);
+chkShowToasts.addEventListener("change", () => {
+  currentSettings.showToasts = chkShowToasts.checked;
+  saveSettings();
+});
+
+selReqLocale.addEventListener("change", () => {
+  currentSettings.requestLocale = selReqLocale.value;
+  saveSettings();
+});
+
+selUiLocale.addEventListener("change", async () => {
+  currentSettings.uiLocale = selUiLocale.value;
+  saveSettings();
+  await loadI18n(currentSettings.uiLocale);
+  applyI18n();
+  // Re-render dynamic content that uses translated strings
+  renderLibrary(libSearch.value);
+  renderIgnored();
+  renderDismissed();
+  setAuthState(hasAuth);
+  setSteamAuthState(hasSteamAuth);
+  applyDebugState(currentSettings.debugLogs);
+  // Update lib count
+  libCount.textContent = allGames.length === 1 ? t("lib_count_1", { n: 1 }) : t("lib_count", { n: allGames.length });
+});
+
+// Clear data buttons
+let pendingClearAction = null;
+const settingsConfirm = document.getElementById("settings-confirm");
+
+function showClearConfirm(action) {
+  pendingClearAction = action;
+  settingsConfirm.classList.add("visible");
+}
+
+document.getElementById("btn-clr-dismissed").addEventListener("click", () => showClearConfirm("dismissed"));
+document.getElementById("btn-clr-ignored").addEventListener("click",   () => showClearConfirm("ignored"));
+document.getElementById("btn-clr-library").addEventListener("click",   () => showClearConfirm("library"));
+
+document.getElementById("btn-s-confirm-no").addEventListener("click", () => {
+  pendingClearAction = null;
+  settingsConfirm.classList.remove("visible");
+});
+
+document.getElementById("btn-s-confirm-yes").addEventListener("click", () => {
+  settingsConfirm.classList.remove("visible");
+  if (!pendingClearAction) return;
+  if (pendingClearAction === "dismissed") {
+    chrome.storage.local.remove(DISMISSED_KEY, () => loadData());
+  } else if (pendingClearAction === "ignored") {
+    chrome.storage.local.remove(IGNORE_KEY, () => loadData());
+  } else if (pendingClearAction === "library") {
+    chrome.storage.local.remove(
+      [LIBRARY_KEY, IGNORE_KEY, DISMISSED_KEY, "epicLastScan", "steamLastScan", "epicOrderLastScan"],
+      () => { allGames = []; allIgnored = []; allDismissed = []; loadData(); }
+    );
+  }
+  pendingClearAction = null;
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────
-loadData();
+async function init() {
+  const settings = await loadSettings();
+  await loadI18n(settings.uiLocale);
+  applyI18n();
+  applySettingsToUI(settings);
+  applyDebugState(settings.debugLogs);
+  loadData();
+  chrome.runtime.sendMessage({ action: "checkAuth" },      (r) => setAuthState(!!r?.hasAuth));
+  chrome.runtime.sendMessage({ action: "checkSteamAuth" }, (r) => setSteamAuthState(!!r?.hasAuth));
+}
 
-// Refresh library if the importer tab writes new data while the popup is open.
+init();
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && (LIBRARY_KEY in changes || IGNORE_KEY in changes)) {
     loadData();
-    setLibStatus("Library updated from import", "ok");
+    setLibStatus(t("import_done"), "ok");
   }
 });
+
 setInterval(() => {
   chrome.storage.local.get(["epicLastScan", "steamLastScan"], r => {
     statScan.textContent      = timeAgo(r.epicLastScan);

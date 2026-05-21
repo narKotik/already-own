@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Already Own?",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "Shows your Epic and Steam libraries on store pages so you never buy a game you already own. Scans both Epic and Steam.",
   "permissions": [
     "storage",
@@ -42,6 +42,16 @@
   "background": {
     "service_worker": "background.js"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["locales/*.json"],
+      "matches": [
+        "https://store.epicgames.com/*",
+        "https://www.epicgames.com/*",
+        "https://store.steampowered.com/*"
+      ]
+    }
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

@@ -1,10 +1,10 @@
-// background.js v1.4.2
+// background.js v1.5.0
 // ALL network requests happen here — service workers are not subject to CORS.
 // The content script just grabs auth tokens from the page and sends them here.
 
 const LIBRARY_KEY = "elsLibrary";   // [{title, source}]  source: "epic"|"steam"|"other"
 const IGNORE_KEY  = "elsIgnoredGames"; // [{title, source}]
-const VERSION = "1.4.2";
+const VERSION = "1.5.0";
 let DEBUG = false; // set true (or via Debug logs checkbox in popup) to enable full title-list dumps
 
 // ── Logger ────────────────────────────────────────────────────────────────
@@ -248,7 +248,7 @@ async function fetchViaLibraryAPI(authToken) {
 }
 
 // ── Order history API ─────────────────────────────────────────────────────
-async function fetchViaOrderHistory() {
+async function fetchViaOrderHistory(requestLocale = "en-US") {
   const BASE = "https://accounts.epicgames.com/account/v2/payment/ajaxGetOrderHistory";
 
   // On subsequent scans only fetch orders newer than last scan (orders are DESC by date).
@@ -267,7 +267,7 @@ async function fetchViaOrderHistory() {
     url.searchParams.set("count", "100");
     url.searchParams.set("sortDir", "DESC");
     url.searchParams.set("sortBy", "DATE");
-    url.searchParams.set("locale", "en-US");
+    url.searchParams.set("locale", requestLocale);
     if (nextPageToken) url.searchParams.set("nextPageToken", nextPageToken);
 
     const resp = await fetch(url.toString(), { credentials: "include" });
@@ -460,8 +460,9 @@ async function fetchViaOwnedItems(authToken, accountIdFromPage) {
 // ── Main scan ─────────────────────────────────────────────────────────────
 async function doScan(authFromPage, accountIdFromPage) {
   logs.length = 0;
-  const { epicDebugLogs } = await chrome.storage.local.get("epicDebugLogs");
-  DEBUG = !!epicDebugLogs;
+  const { elsSettings, epicDebugLogs } = await chrome.storage.local.get(["elsSettings", "epicDebugLogs"]);
+  DEBUG = !!(elsSettings?.debugLogs ?? epicDebugLogs);
+  const requestLocale = elsSettings?.requestLocale ?? "en-US";
   info(`Already Own? v${VERSION} background scan started`);
   info("Auth token from page?", authFromPage ? `Yes (${authFromPage.length} chars)` : "No");
   info("Account ID from page?", accountIdFromPage ? accountIdFromPage.slice(0, 8) + "..." : "No");
@@ -484,7 +485,7 @@ async function doScan(authFromPage, accountIdFromPage) {
   }
 
   const methods = [
-    { name: "Order History API",  fn: () => fetchViaOrderHistory() },
+    { name: "Order History API",  fn: () => fetchViaOrderHistory(requestLocale) },
     { name: "Library Service API", fn: () => fetchViaLibraryAPI(authToken) },
   ];
 
@@ -827,8 +828,8 @@ async function fetchSteamViaStoreApi(steamId) {
 // ── Steam scan ────────────────────────────────────────────────────────────
 async function doSteamScan() {
   logs.length = 0;
-  const { epicDebugLogs } = await chrome.storage.local.get("epicDebugLogs");
-  DEBUG = !!epicDebugLogs;
+  const { elsSettings: steamSettings, epicDebugLogs: steamDebugLogs } = await chrome.storage.local.get(["elsSettings", "epicDebugLogs"]);
+  DEBUG = !!(steamSettings?.debugLogs ?? steamDebugLogs);
   info(`Already Own? v${VERSION} Steam scan started`);
 
   const steamId = await getSteamIdFromCookie();
