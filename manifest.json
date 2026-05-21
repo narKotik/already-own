@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Already Own?",
   "version": "1.5.0",
+  "default_locale": "en",
   "description": "Shows your Epic and Steam libraries on store pages so you never buy a game you already own. Scans both Epic and Steam.",
   "permissions": [
     "storage",

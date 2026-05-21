@@ -17,6 +17,7 @@ INCLUDE=(
   importer.html
   importer.js
   locales/
+  _locales/
   icons/
 )
 
