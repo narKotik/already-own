@@ -1,10 +1,10 @@
-// background.js v1.4.1
+// background.js v1.4.2
 // ALL network requests happen here — service workers are not subject to CORS.
 // The content script just grabs auth tokens from the page and sends them here.
 
 const LIBRARY_KEY = "elsLibrary";   // [{title, source}]  source: "epic"|"steam"|"other"
 const IGNORE_KEY  = "elsIgnoredGames"; // [{title, source}]
-const VERSION = "1.4.1";
+const VERSION = "1.4.2";
 let DEBUG = false; // set true (or via Debug logs checkbox in popup) to enable full title-list dumps
 
 // ── Logger ────────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ function authHeaders(authToken) {
 // ── Library service API ───────────────────────────────────────────────────
 async function fetchViaLibraryAPI(authToken) {
   const BASE = "https://library-service.live.use1a.on.epicgames.com/library/api/public/items";
-  info("Method 3: Library Service API", BASE);
+  info("Method 2: Library Service API", BASE);
 
   const allRecords = [];
   let cursor = null;
@@ -244,6 +244,85 @@ async function fetchViaLibraryAPI(authToken) {
 
   info(`Library API OK — ${uniqueTitles.length} titles`);
   return uniqueTitles;
+}
+
+// ── Order history API ─────────────────────────────────────────────────────
+async function fetchViaOrderHistory() {
+  const BASE = "https://accounts.epicgames.com/account/v2/payment/ajaxGetOrderHistory";
+  info("Order history: fetching from", BASE);
+
+  const allOrders = [];
+  let nextPageToken = null;
+  let page = 0;
+
+  while (true) {
+    const url = new URL(BASE);
+    url.searchParams.set("count", "100");
+    url.searchParams.set("sortDir", "DESC");
+    url.searchParams.set("sortBy", "DATE");
+    url.searchParams.set("locale", "en-US");
+    if (nextPageToken) url.searchParams.set("nextPageToken", nextPageToken);
+
+    const resp = await fetch(url.toString(), { credentials: "include" });
+    info(`Order history HTTP status (page ${page})`, resp.status);
+    if (resp.status === 401 || resp.status === 403) {
+      throw new Error(`HTTP ${resp.status}: Not authenticated — open accounts.epicgames.com in Chrome and sign in`);
+    }
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      throw new Error(`HTTP ${resp.status}: ${text.slice(0, 200)}`);
+    }
+
+    const json = await resp.json();
+    const orders = json?.orders;
+    if (!Array.isArray(orders)) throw new Error("Unexpected response shape — not an orders array");
+
+    info(`Order history page ${page}: ${orders.length} orders`);
+    allOrders.push(...orders);
+
+    nextPageToken = json?.nextPageToken || null;
+    if (!nextPageToken || orders.length === 0) break;
+
+    page++;
+    if (page > 200) { warn("Order history pagination safety limit reached"); break; }
+
+    // Delay between pages
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  info(`Order history: ${allOrders.length} total orders across ${page + 1} page(s)`);
+
+  // Only EGS purchases — exclude launcher/other merchant groups
+  const egsPurchases = allOrders.filter(o => o.orderType === "PURCHASE" && o.merchantGroup === "EGS_MKT");
+  const egsRefunds   = allOrders.filter(o => o.orderType === "REFUND"   && o.merchantGroup === "EGS_MKT");
+
+  info(`Order history: ${egsPurchases.length} purchases, ${egsRefunds.length} refunds`);
+
+  // Build set of refunded namespace:offerId keys
+  const refundedKeys = new Set();
+  for (const order of egsRefunds) {
+    for (const item of (order.items || [])) {
+      if (item.namespace && item.offerId) refundedKeys.add(`${item.namespace}:${item.offerId}`);
+    }
+  }
+
+  // Collect unique descriptions from non-refunded purchases
+  const titleSet = new Set();
+  for (const order of egsPurchases) {
+    for (const item of (order.items || [])) {
+      if (!item.description) continue;
+      if (refundedKeys.has(`${item.namespace}:${item.offerId}`)) {
+        info(`Skipping refunded item: ${item.description}`);
+        continue;
+      }
+      titleSet.add(item.description);
+    }
+  }
+
+  const titles = [...titleSet].filter(t => t.length > 1);
+  info(`Order history OK — ${titles.length} unique titles`);
+  logDump("FULL order history titles (sorted)", [...titles].sort((a, b) => a.localeCompare(b)));
+  return titles;
 }
 
 // ── Catalog API: resolve titles for records with sandboxName "Live" ───────
@@ -375,6 +454,7 @@ async function doScan(authFromPage, accountIdFromPage) {
   }
 
   const methods = [
+    { name: "Order History API",  fn: () => fetchViaOrderHistory() },
     { name: "Library Service API", fn: () => fetchViaLibraryAPI(authToken) },
   ];
 
