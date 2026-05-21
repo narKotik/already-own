@@ -37,6 +37,45 @@ https://chromewebstore.google.com/detail/already-own/ioelkjobebpdbndlmeebgmbfknb
 ### Browse stores
 Visit any game page on `store.steampowered.com/app/…` or `store.epicgames.com/p/…`. If you own the game in your other library, a badge appears above the buy button automatically.
 
+## Settings
+
+Open the **⚙️ Settings** tab to configure the extension.
+
+### Badge matching
+
+Choose which confidence levels trigger the ownership badge:
+
+| Option | What it means |
+|--------|---------------|
+| **Exact match** | Normalized titles are identical (green badge) |
+| **Partial match** | One title contains the other — handles subtitles like "Game: DLC Edition" vs "Game" (blue badge) |
+| **Fuzzy match** | ≥75% word overlap — catches spelling variants and reorderings (orange badge) |
+
+At least one option must stay checked. Turning off fuzzy reduces false positives; turning off partial is useful if you only want perfect title matches.
+
+### Language
+
+- **Display language** — translates the extension popup and store badges. Available languages: English (US), Português (Brasil), Español (Latinoamérica), Polski, Türkçe, Українська.
+- **API request language** — locale sent in requests to Epic's API (affects game title language returned by the order history endpoint). Defaults to English; change if you want titles in your local language.
+
+### Notifications
+
+- **Show scan result notification** — toggles the in-page toast that appears after a scan completes.
+
+### Debug
+
+- **Show Logs tab** — reveals the Logs tab with detailed scan diagnostics. Enable this before reporting a bug.
+
+### Clear data
+
+| Button | What it removes |
+|--------|----------------|
+| Clear dismissed badges | Resets pages where you clicked ✕ — badges will reappear |
+| Clear ignored games | Removes your ignore list (games may reappear on next scan) |
+| Clear all library data | Deletes the full library, scan timestamps, ignored list, and dismissed badges |
+
+All clear actions show a confirmation prompt before executing.
+
 ## Tips
 
 - Re-scan after buying new games to keep the list up to date
