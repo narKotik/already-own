@@ -73,7 +73,6 @@
   "settings_match_fuzzy_hint": "≥75% nakładania się słów",
   "settings_language": "Język",
   "settings_ui_locale": "Język aplikacji",
-  "settings_req_locale": "Język zapytań API",
   "settings_notifications": "Powiadomienia",
   "settings_toasts": "Pokaż powiadomienie o wyniku skanowania",
   "settings_debug_section": "Debugowanie",

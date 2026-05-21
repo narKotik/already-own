@@ -73,7 +73,6 @@
   "settings_match_fuzzy_hint": "≥75% збігу слів",
   "settings_language": "Мова",
   "settings_ui_locale": "Мова інтерфейсу",
-  "settings_req_locale": "Мова API-запитів",
   "settings_notifications": "Сповіщення",
   "settings_toasts": "Показувати сповіщення про результат сканування",
   "settings_debug_section": "Налагодження",

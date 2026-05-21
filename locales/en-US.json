@@ -73,7 +73,6 @@
   "settings_match_fuzzy_hint": "≥75% word overlap",
   "settings_language": "Language",
   "settings_ui_locale": "Display language",
-  "settings_req_locale": "API request language",
   "settings_notifications": "Notifications",
   "settings_toasts": "Show scan result notification",
   "settings_debug_section": "Debug",

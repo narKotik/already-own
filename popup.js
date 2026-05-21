@@ -7,7 +7,7 @@ const SETTINGS_KEY  = "elsSettings";
 
 const DEFAULT_SETTINGS = {
   matchExact: true, matchPartial: true, matchFuzzy: true,
-  uiLocale: "en-US", requestLocale: "en-US",
+  uiLocale: "en-US",
   showToasts: true, debugLogs: false,
 };
 
@@ -44,7 +44,6 @@ const chkMatchFuzzy   = document.getElementById("chk-match-fuzzy");
 const chkShowToasts   = document.getElementById("chk-show-toasts");
 const chkDebugLogs    = document.getElementById("chk-debug-logs");
 const selUiLocale     = document.getElementById("sel-ui-locale");
-const selReqLocale    = document.getElementById("sel-req-locale");
 
 // ── State ─────────────────────────────────────────────────────────────────
 let i18n = {};
@@ -120,7 +119,6 @@ function applySettingsToUI(s) {
   chkShowToasts.checked   = s.showToasts;
   chkDebugLogs.checked    = s.debugLogs;
   selUiLocale.value       = s.uiLocale;
-  selReqLocale.value      = s.requestLocale;
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
@@ -623,11 +621,6 @@ btnSteamScan.addEventListener("click", () => {
 
 chkShowToasts.addEventListener("change", () => {
   currentSettings.showToasts = chkShowToasts.checked;
-  saveSettings();
-});
-
-selReqLocale.addEventListener("change", () => {
-  currentSettings.requestLocale = selReqLocale.value;
   saveSettings();
 });
 

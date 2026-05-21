@@ -462,7 +462,6 @@ async function doScan(authFromPage, accountIdFromPage) {
   logs.length = 0;
   const { elsSettings, epicDebugLogs } = await chrome.storage.local.get(["elsSettings", "epicDebugLogs"]);
   DEBUG = !!(elsSettings?.debugLogs ?? epicDebugLogs);
-  const requestLocale = elsSettings?.requestLocale ?? "en-US";
   info(`Already Own? v${VERSION} background scan started`);
   info("Auth token from page?", authFromPage ? `Yes (${authFromPage.length} chars)` : "No");
   info("Account ID from page?", accountIdFromPage ? accountIdFromPage.slice(0, 8) + "..." : "No");
@@ -485,7 +484,7 @@ async function doScan(authFromPage, accountIdFromPage) {
   }
 
   const methods = [
-    { name: "Order History API",  fn: () => fetchViaOrderHistory(requestLocale) },
+    { name: "Order History API",  fn: () => fetchViaOrderHistory("en-US") },
     { name: "Library Service API", fn: () => fetchViaLibraryAPI(authToken) },
   ];
 

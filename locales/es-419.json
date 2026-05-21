@@ -73,7 +73,6 @@
   "settings_match_fuzzy_hint": "≥75% de superposición de palabras",
   "settings_language": "Idioma",
   "settings_ui_locale": "Idioma de la aplicación",
-  "settings_req_locale": "Idioma de solicitudes API",
   "settings_notifications": "Notificaciones",
   "settings_toasts": "Mostrar notificación de resultado del escaneo",
   "settings_debug_section": "Depuración",
