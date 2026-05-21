@@ -575,13 +575,20 @@ async function fetchNamesFromProfilePage(steamId) {
         };
 
         collect();
-        // Scroll until the set stops growing (handles React virtual-scroll lists)
-        let prev = -1;
-        while (seen.size !== prev) {
-          prev = seen.size;
-          window.scrollTo(0, document.body.scrollHeight);
-          await new Promise(r => setTimeout(r, 400));
-          collect();
+        // Scroll incrementally — React virtual lists only render items near the
+        // viewport, so jumping straight to the bottom misses everything in between.
+        // Require 3 consecutive passes with no new names before stopping.
+        let stable = 0;
+        while (stable < 3) {
+          const before = seen.size;
+          const step = window.innerHeight || 800;
+          for (let y = window.scrollY + step; y <= document.body.scrollHeight + step; y += step) {
+            window.scrollTo(0, y);
+            await new Promise(r => setTimeout(r, 300));
+            collect();
+          }
+          if (seen.size === before) stable++;
+          else stable = 0;
         }
         return seen.size > 0
           ? { names: [...seen], via: "dom" }

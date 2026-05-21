@@ -516,7 +516,7 @@ btnScan.addEventListener("click", () => {
       setStatus(t("err_no_response"), "err");
       return;
     }
-    if (response.logs?.length) { storedLogs = response.logs; renderLogs(storedLogs); }
+    if (currentSettings.debugLogs && response.logs?.length) { storedLogs = response.logs; renderLogs(storedLogs); }
 
     if (!response.success) {
       const authErr = response.error?.includes("401") || response.error?.includes("403") || response.error?.includes("authenticated");
@@ -526,14 +526,13 @@ btnScan.addEventListener("click", () => {
       } else {
         setAuthState(true);
         setStatus(`❌ ${response.error}`, "err");
-        switchTab("logs");
+        if (currentSettings.debugLogs) switchTab("logs");
       }
       return;
     }
     setAuthState(true);
     if (!response.games?.length) {
       setStatus(t("scan_zero_epic"), "warn");
-      switchTab("logs");
     } else {
       setStatus(t("scan_ok_epic", { total: response.total, added: response.added, method: response.method }), "ok");
       loadData();
@@ -581,7 +580,7 @@ btnSteamScan.addEventListener("click", () => {
       setStatus(t("err_no_response"), "err");
       return;
     }
-    if (response.logs?.length) { storedLogs = response.logs; renderLogs(storedLogs); }
+    if (currentSettings.debugLogs && response.logs?.length) { storedLogs = response.logs; renderLogs(storedLogs); }
 
     if (!response.success) {
       const notLoggedIn = response.error?.includes("Not logged") || response.error?.includes("not logged") || response.error?.includes("Not signed");
@@ -591,14 +590,13 @@ btnSteamScan.addEventListener("click", () => {
       } else {
         setSteamAuthState(true);
         setStatus(`❌ ${response.error}`, "err");
-        switchTab("logs");
+        if (currentSettings.debugLogs) switchTab("logs");
       }
       return;
     }
     setSteamAuthState(true);
     if (!response.games?.length) {
       setStatus(t("scan_zero_steam"), "warn");
-      switchTab("logs");
     } else {
       setStatus(t("scan_ok_steam", { total: response.total, added: response.added }), "ok");
       loadData();
