@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Already Own?</title>
+<style>
+  body { max-width: 680px; margin: 48px auto; padding: 0 24px; font-family: system-ui, sans-serif; color: #24292f; line-height: 1.7; }
+  h1 { font-size: 28px; margin-bottom: 4px; }
+  h2 { font-size: 18px; margin-top: 32px; }
+  .updated { color: #57606a; font-size: 14px; margin-bottom: 32px; }
+  code { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4px; padding: 1px 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Privacy Policy</h1>
+<p class="updated">Last updated: May 2026</p>
+
+<p><strong>Already Own?</strong> is a Chrome extension that checks whether you already own a game on Steam or Epic Games before buying it. This policy explains what data the extension accesses and how it is handled.</p>
+
+<h2>Data We Collect</h2>
+<p><strong>We collect nothing.</strong> The extension does not transmit any data to any server. There are no analytics, no telemetry, no crash reports, and no external services involved.</p>
+
+<h2>Data Stored Locally</h2>
+<p>The extension stores the following data <em>on your device only</em>, using Chrome's <code>chrome.storage.local</code> API:</p>
+<ul>
+  <li>Your game library (titles and their source: Steam or Epic) — populated by scanning your store accounts</li>
+  <li>Your ignore list — games you have manually excluded from matching</li>
+  <li>Dismissed badge records — pages where you clicked the dismiss button on an ownership badge</li>
+  <li>Scan timestamps and debug log preference</li>
+</ul>
+<p>This data never leaves your browser. It is not shared with, sold to, or accessible by anyone other than you.</p>
+
+<h2>Permissions Used and Why</h2>
+<ul>
+  <li><strong>storage</strong> — Save your game library and settings locally in Chrome.</li>
+  <li><strong>scripting</strong> — Inject the "You already own this" badge onto Epic and Steam store pages.</li>
+  <li><strong>tabs</strong> — Open a temporary background tab on <code>steamcommunity.com</code> to read your Steam games list during a scan. The tab is closed immediately after.</li>
+  <li><strong>cookies</strong> — Read your existing Steam and Epic session cookies to authenticate API requests. The extension only reads cookies; it never creates, modifies, or deletes them. Cookies are not stored or transmitted anywhere.</li>
+</ul>
+
+<h2>Third-Party API Calls</h2>
+<p>During a scan the extension makes authenticated requests to Epic Games and Steam APIs on your behalf using your existing session. These requests are identical to what your browser would send when browsing those sites normally. No additional data is attached. The extension does not store API responses beyond the extracted game titles.</p>
+
+<h2>Third-Party Services</h2>
+<p>None. The extension does not use any analytics, advertising, or tracking services.</p>
+
+<h2>Changes to This Policy</h2>
+<p>If a future update changes how data is handled, this policy will be updated and the extension changelog will note the change.</p>
+
+<h2>Contact</h2>
+<p>Questions or concerns? Open an issue on the <a href="https://github.com/narKotik/already-own">GitHub repository</a>.</p>
+</body>
+</html>
