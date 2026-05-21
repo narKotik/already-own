@@ -298,29 +298,43 @@ async function fetchViaOrderHistory() {
 
   info(`Order history: ${egsPurchases.length} purchases, ${egsRefunds.length} refunds`);
 
-  // Build set of refunded namespace:offerId keys
-  const refundedKeys = new Set();
+  // Build map of refunded namespace:offerId → description
+  const refundedKeys = new Map();
   for (const order of egsRefunds) {
     for (const item of (order.items || [])) {
-      if (item.namespace && item.offerId) refundedKeys.add(`${item.namespace}:${item.offerId}`);
+      if (item.namespace && item.offerId && item.description)
+        refundedKeys.set(`${item.namespace}:${item.offerId}`, item.description);
     }
   }
 
   // Collect unique descriptions from non-refunded purchases
   const titleSet = new Set();
+  const refundedTitles = new Set();
   for (const order of egsPurchases) {
     for (const item of (order.items || [])) {
       if (!item.description) continue;
       if (refundedKeys.has(`${item.namespace}:${item.offerId}`)) {
-        info(`Skipping refunded item: ${item.description}`);
+        info(`Refunded item — will remove from library: ${item.description}`);
+        refundedTitles.add(item.description);
         continue;
       }
       titleSet.add(item.description);
     }
   }
 
+  // Remove refunded titles from the saved library
+  if (refundedTitles.size > 0) {
+    const result = await chrome.storage.local.get(LIBRARY_KEY);
+    const existing = result[LIBRARY_KEY] || [];
+    const refundedNorm = new Set([...refundedTitles].map(normKey));
+    const cleaned = existing.filter(g => !(g.source === "epic" && refundedNorm.has(normKey(g.title))));
+    const removed = existing.length - cleaned.length;
+    await chrome.storage.local.set({ [LIBRARY_KEY]: cleaned });
+    info(`Removed ${removed} refunded title(s) from library`);
+  }
+
   const titles = [...titleSet].filter(t => t.length > 1);
-  info(`Order history OK — ${titles.length} unique titles`);
+  info(`Order history OK — ${titles.length} unique titles, ${refundedTitles.size} refunds removed`);
   logDump("FULL order history titles (sorted)", [...titles].sort((a, b) => a.localeCompare(b)));
   return titles;
 }
