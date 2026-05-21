@@ -56,7 +56,6 @@ At least one option must stay checked. Turning off fuzzy reduces false positives
 ### Language
 
 - **Display language** — translates the extension popup and store badges. Available languages: English (US), Português (Brasil), Español (Latinoamérica), Polski, Türkçe, Українська.
-- **API request language** — locale sent in requests to Epic's API (affects game title language returned by the order history endpoint). Defaults to English; change if you want titles in your local language.
 
 ### Notifications
 
