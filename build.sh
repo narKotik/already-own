@@ -16,6 +16,7 @@ INCLUDE=(
   popup.js
   importer.html
   importer.js
+  locales/
   icons/
 )
 
