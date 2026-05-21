@@ -226,13 +226,10 @@ function renderLibrary(filter = "") {
 function renderIgnored() {
   const toggleRow = document.getElementById("ignored-toggle-row");
   const section   = document.getElementById("ignored-section");
-  const countEl   = document.getElementById("ignored-count");
   const headerText = document.getElementById("ignored-header-text");
   const chevron   = document.getElementById("ignored-chevron");
   const list      = document.getElementById("ignored-list");
 
-  countEl.textContent = allIgnored.length;
-  // rebuild header text with translated label
   headerText.textContent = "";
   const labelSpan = document.createElement("span");
   labelSpan.textContent = t("lib_ignored_header", { n: allIgnored.length });
@@ -285,11 +282,9 @@ document.getElementById("btn-ignored-toggle").addEventListener("click", () => {
 function renderDismissed() {
   const toggleRow = document.getElementById("dismissed-toggle-row");
   const section   = document.getElementById("dismissed-section");
-  const countEl   = document.getElementById("dismissed-count");
   const headerText = document.getElementById("dismissed-header-text");
   const list      = document.getElementById("dismissed-list");
 
-  countEl.textContent = allDismissed.length;
   headerText.textContent = "";
   const labelSpan = document.createElement("span");
   labelSpan.textContent = t("lib_dismissed_header", { n: allDismissed.length });
