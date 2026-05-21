@@ -250,7 +250,13 @@ async function fetchViaLibraryAPI(authToken) {
 // ── Order history API ─────────────────────────────────────────────────────
 async function fetchViaOrderHistory() {
   const BASE = "https://accounts.epicgames.com/account/v2/payment/ajaxGetOrderHistory";
-  info("Order history: fetching from", BASE);
+
+  // On subsequent scans only fetch orders newer than last scan (orders are DESC by date).
+  // Use a 1-day buffer to avoid missing anything near the boundary.
+  const { epicOrderLastScan } = await chrome.storage.local.get("epicOrderLastScan");
+  const cutoff = epicOrderLastScan ? epicOrderLastScan - 86_400_000 : 0;
+  const isIncremental = cutoff > 0;
+  info(`Order history: ${isIncremental ? `incremental (since ${new Date(cutoff).toISOString().slice(0,10)})` : "full scan"}`, BASE);
 
   const allOrders = [];
   let nextPageToken = null;
@@ -278,8 +284,16 @@ async function fetchViaOrderHistory() {
     const orders = json?.orders;
     if (!Array.isArray(orders)) throw new Error("Unexpected response shape — not an orders array");
 
-    info(`Order history page ${page}: ${orders.length} orders`);
-    allOrders.push(...orders);
+    // Stop at cutoff — orders are DESC so once oldest on page is before cutoff we're done
+    if (cutoff > 0) {
+      const newOrders = orders.filter(o => (o.createdAtMillis || 0) >= cutoff);
+      allOrders.push(...newOrders);
+      info(`Order history page ${page}: ${orders.length} orders, ${newOrders.length} within range`);
+      if (newOrders.length < orders.length) break; // hit the cutoff
+    } else {
+      allOrders.push(...orders);
+      info(`Order history page ${page}: ${orders.length} orders`);
+    }
 
     nextPageToken = json?.nextPageToken || null;
     if (!nextPageToken || orders.length === 0) break;
@@ -337,6 +351,7 @@ async function fetchViaOrderHistory() {
   const titles = [...titleSet].filter(t => t.length > 1);
   info(`Order history OK — ${titles.length} unique titles, ${refundedTitles.size} refunds removed`);
   logDump("FULL order history titles (sorted)", [...titles].sort((a, b) => a.localeCompare(b)));
+  await chrome.storage.local.set({ epicOrderLastScan: Date.now() });
   return titles;
 }
 
