@@ -212,35 +212,36 @@ async function fetchViaLibraryAPI(authToken) {
   info(`Library API total records (${page} page${page > 1 ? "s" : ""})`, allRecords.length);
 
   // Skip UE Marketplace asset packs — not games.
-  const normalRecords = allRecords.filter(r => r.sandboxName !== "UE Marketplace");
+  const liveRecords   = allRecords.filter(r => r.sandboxName === "Live");
+  const normalRecords = allRecords.filter(r => r.sandboxName !== "Live" && r.sandboxName !== "UE Marketplace");
 
-  // Parse titles directly from sandboxName/title fields in the library response.
-  // Catalog API lookup is commented out — sandboxName appears to already contain readable names.
-  /*
-  const liveRecords = allRecords.filter(r => r.sandboxName === "Live");
-  const filteredRecords = allRecords.filter(r => r.sandboxName !== "Live" && r.sandboxName !== "UE Marketplace");
+  // Resolve real titles via catalog API (namespace + catalogItemId → title)
   const [normalCatalogTitles, liveCatalogTitles] = await Promise.all([
-    filteredRecords.length > 0 ? fetchCatalogTitles(filteredRecords, authToken, "normal") : Promise.resolve([]),
-    liveRecords.length     > 0 ? fetchCatalogTitles(liveRecords,     authToken, "live")   : Promise.resolve([]),
+    normalRecords.length > 0 ? fetchCatalogTitles(normalRecords, authToken, "normal") : Promise.resolve([]),
+    liveRecords.length   > 0 ? fetchCatalogTitles(liveRecords,   authToken, "live")   : Promise.resolve([]),
   ]);
-  */
 
-  const rawTitles = normalRecords.flatMap(r => {
-    const sandbox = _isUUID(r.sandboxName) ? null : r.sandboxName;
-    const root    = _isUUID(r.title)       ? null : r.title;
-    const seen = new Set();
-    const out = [];
-    for (const t of [sandbox, root]) {
-      if (t && t.length > 1 && !seen.has(t)) { seen.add(t); out.push(t); }
-    }
-    return out;
-  });
+  const rawTitles = [
+    ...normalCatalogTitles,
+    ...liveCatalogTitles,
+    // Fallback: sandboxName/title for records the catalog didn't resolve
+    ...normalRecords.flatMap(r => {
+      const sandbox = _isUUID(r.sandboxName) ? null : r.sandboxName;
+      const root    = _isUUID(r.title)       ? null : r.title;
+      const seen = new Set();
+      const out = [];
+      for (const t of [sandbox, root]) {
+        if (t && t.length > 1 && !seen.has(t)) { seen.add(t); out.push(t); }
+      }
+      return out;
+    }),
+  ];
 
   const cleanTitles = rawTitles.filter(t => !_isJunkTitle(t));
   const uniqueTitles = [...new Set(cleanTitles)].sort((a, b) => a.localeCompare(b));
-  info(`Library API: ${normalRecords.length} records → ${rawTitles.length - cleanTitles.length} junk filtered → ${uniqueTitles.length} unique titles`);
+  info(`Library API: ${normalRecords.length} normal (${normalCatalogTitles.length} catalog) + ${liveRecords.length} Live (${liveCatalogTitles.length} catalog) → ${rawTitles.length - cleanTitles.length} junk filtered → ${uniqueTitles.length} unique titles`);
 
-  logDump("FULL titles from library response (sorted)", uniqueTitles);
+  logDump("FULL titles from library API (sorted)", uniqueTitles);
 
   info(`Library API OK — ${uniqueTitles.length} titles`);
   return uniqueTitles;
