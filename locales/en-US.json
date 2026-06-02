@@ -57,6 +57,8 @@
   "scan_zero_steam": "⚠️ Steam scan ran but found 0 games — check Logs tab.",
   "noauth_epic": "Not signed in to Epic in Chrome — click the button to open the store and log in.",
   "noauth_steam": "Not signed in to Steam — click the button to open the store and log in.",
+  "scan_resuming_epic": "⏳ Epic scan is running in the background…",
+  "scan_resuming_steam": "⏳ Steam scan is running in the background…",
   "err_ext": "Extension error — try reloading.",
   "err_no_response": "No response received.",
   "logs_title": "Scan diagnostics",

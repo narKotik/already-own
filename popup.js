@@ -53,6 +53,8 @@ let storedLogs   = [];
 let hasAuth      = false;
 let hasSteamAuth = false;
 let initialLoad  = true;
+let epicScanActive  = false; // true while a background Epic scan is running
+let steamScanActive = false;
 
 const normKey      = s => s.replace(/[™®©]/g, "").toLowerCase().trim();
 const preferRicher = (a, b) => (/[™®©]/.test(b) && !/[™®©]/.test(a)) ? b : a;
@@ -472,6 +474,7 @@ chkDebugLogs.addEventListener("change", () => {
 // ── Epic scan ─────────────────────────────────────────────────────────────
 function setAuthState(auth) {
   hasAuth = auth;
+  if (epicScanActive) return;
   btnScan.disabled = false;
   scanSpinner.style.display = "none";
   if (auth) {
@@ -492,12 +495,14 @@ btnScan.addEventListener("click", () => {
     scanDesc.textContent = t("sign_in_epic_desc");
     return;
   }
+  epicScanActive = true;
   btnScan.disabled = true;
   scanSpinner.style.display = "block";
   scanLabel.textContent = t("scanning");
   setStatus("", "");
 
   chrome.runtime.sendMessage({ action: "doScan", authToken: null, accountId: null }, (response) => {
+    epicScanActive = false;
     if (chrome.runtime.lastError) {
       setAuthState(hasAuth);
       setStatus(t("err_ext"), "err");
@@ -536,6 +541,7 @@ btnScan.addEventListener("click", () => {
 // ── Steam scan ────────────────────────────────────────────────────────────
 function setSteamAuthState(auth) {
   hasSteamAuth = auth;
+  if (steamScanActive) return;
   btnSteamScan.disabled = false;
   steamSpinner.style.display = "none";
   if (auth) {
@@ -556,12 +562,14 @@ btnSteamScan.addEventListener("click", () => {
     steamScanDesc.textContent = t("sign_in_steam_desc");
     return;
   }
+  steamScanActive = true;
   btnSteamScan.disabled = true;
   steamSpinner.style.display = "block";
   steamLabel.textContent = t("scanning");
   setStatus("", "");
 
   chrome.runtime.sendMessage({ action: "doSteamScan" }, (response) => {
+    steamScanActive = false;
     if (chrome.runtime.lastError) {
       setSteamAuthState(hasSteamAuth);
       setStatus(t("err_ext"), "err");
@@ -669,14 +677,59 @@ async function init() {
   loadData();
   chrome.runtime.sendMessage({ action: "checkAuth" },      (r) => setAuthState(!!r?.hasAuth));
   chrome.runtime.sendMessage({ action: "checkSteamAuth" }, (r) => setSteamAuthState(!!r?.hasAuth));
+
+  // Restore scanning UI if a scan was running when the popup was last closed.
+  // Treat anything older than 7 minutes as stale (service worker died mid-scan).
+  const STALE_MS = 5 * 60 * 1000;
+  chrome.storage.local.get(["epicScanInProgress", "epicScanStartedAt", "steamScanInProgress", "steamScanStartedAt"], (r) => {
+    const now = Date.now();
+    if (r.epicScanInProgress) {
+      if (now - (r.epicScanStartedAt || 0) < STALE_MS) {
+        epicScanActive = true;
+        btnScan.disabled = true;
+        scanSpinner.style.display = "block";
+        scanLabel.textContent = t("scanning");
+        scanDesc.textContent = t("scan_resuming_epic");
+        scanDesc.classList.remove("warn");
+      } else {
+        chrome.storage.local.remove(["epicScanInProgress", "epicScanStartedAt"]);
+      }
+    }
+    if (r.steamScanInProgress) {
+      if (now - (r.steamScanStartedAt || 0) < STALE_MS) {
+        steamScanActive = true;
+        btnSteamScan.disabled = true;
+        steamSpinner.style.display = "block";
+        steamLabel.textContent = t("scanning");
+        steamScanDesc.textContent = t("scan_resuming_steam");
+        steamScanDesc.classList.remove("warn");
+      } else {
+        chrome.storage.local.remove(["steamScanInProgress", "steamScanStartedAt"]);
+      }
+    }
+  });
 }
 
 init();
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && (LIBRARY_KEY in changes || IGNORE_KEY in changes)) {
+  if (area !== "local") return;
+  // Scan finished while popup was closed — clear active flag, reset UI, reload.
+  // newValue is undefined when the key was removed via chrome.storage.local.remove().
+  if ("epicScanInProgress" in changes && changes.epicScanInProgress.newValue === undefined) {
+    epicScanActive = false;
+    setAuthState(hasAuth);
     loadData();
-    setLibStatus(t("import_done"), "ok");
+  }
+  if ("steamScanInProgress" in changes && changes.steamScanInProgress.newValue === undefined) {
+    steamScanActive = false;
+    setSteamAuthState(hasSteamAuth);
+    loadData();
+  }
+  // Only show "import done" for actual file imports, not scan saves.
+  if (LIBRARY_KEY in changes || IGNORE_KEY in changes) {
+    loadData();
+    if (!epicScanActive && !steamScanActive) setLibStatus(t("import_done"), "ok");
   }
 });
 

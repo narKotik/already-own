@@ -1,10 +1,10 @@
-// background.js v1.6.0
+// background.js v1.7.0
 // ALL network requests happen here — service workers are not subject to CORS.
 // The content script just grabs auth tokens from the page and sends them here.
 
 const LIBRARY_KEY = "elsLibrary";   // [{title, source}]  source: "epic"|"steam"|"other"
 const IGNORE_KEY  = "elsIgnoredGames"; // [{title, source}]
-const VERSION = "1.6.0";
+const VERSION = "1.7.0";
 let DEBUG = false; // set true (or via Debug logs checkbox in popup) to enable full title-list dumps
 
 // ── Logger ────────────────────────────────────────────────────────────────
@@ -251,12 +251,49 @@ async function fetchViaLibraryAPI(authToken) {
 async function fetchViaOrderHistory(requestLocale = "en-US") {
   const BASE = "https://accounts.epicgames.com/account/v2/payment/ajaxGetOrderHistory";
 
-  // On subsequent scans only fetch orders newer than last scan (orders are DESC by date).
-  // Use a 1-day buffer to avoid missing anything near the boundary.
+  // The order history endpoint lives on accounts.epicgames.com and requires a session
+  // cookie scoped to that subdomain — separate from store.epicgames.com cookies.
+  // Pre-warm the session by loading the accounts page in a background tab first,
+  // exactly like the Steam relay does for store.steampowered.com.
+  let warmupTab = null;
+  try {
+    const existingTabs = await chrome.tabs.query({ url: "https://accounts.epicgames.com/*" });
+    if (existingTabs.length > 0) {
+      info("Order history: accounts.epicgames.com tab already open — session should be active");
+    } else {
+      info("Order history: opening background tab to warm up accounts.epicgames.com session");
+      warmupTab = await chrome.tabs.create({ url: "https://accounts.epicgames.com/account/personal", active: false });
+      await new Promise((resolve) => {
+        const tid = setTimeout(() => {
+          chrome.tabs.onUpdated.removeListener(fn);
+          resolve();
+        }, 15000);
+        function fn(tabId, changeInfo) {
+          if (tabId !== warmupTab.id || changeInfo.status !== "complete") return;
+          chrome.tabs.onUpdated.removeListener(fn);
+          clearTimeout(tid);
+          resolve();
+        }
+        chrome.tabs.onUpdated.addListener(fn);
+      });
+      info("Order history: accounts page loaded");
+    }
+  } catch (e) {
+    warn("Order history: session warm-up failed", e.message);
+  }
+
+  try {
+
+  // Incremental strategy: always fetch page 1, then decide whether to continue.
+  // Orders are returned DESC (newest first).
+  //   - Page has 0 new orders      → nothing changed since last scan, stop.
+  //   - Page has some new, some old → took everything new, found the boundary, stop.
+  //   - Page is entirely new orders → there may be more on the next page, keep going.
+  // This also recovers from a failed previous scan: if epicOrderLastScan is set but
+  // the save didn't complete, the next scan re-fetches everything newer than that stamp.
   const { epicOrderLastScan } = await chrome.storage.local.get("epicOrderLastScan");
-  const cutoff = epicOrderLastScan ? epicOrderLastScan - 86_400_000 : 0;
-  const isIncremental = cutoff > 0;
-  info(`Order history: ${isIncremental ? `incremental (since ${new Date(cutoff).toISOString().slice(0,10)})` : "full scan"}`, BASE);
+  const cutoff = epicOrderLastScan || 0;
+  info(`Order history: ${cutoff > 0 ? `incremental (since ${new Date(cutoff).toISOString().slice(0,10)})` : "full scan"}`, BASE);
 
   const allOrders = [];
   let nextPageToken = null;
@@ -284,12 +321,12 @@ async function fetchViaOrderHistory(requestLocale = "en-US") {
     const orders = json?.orders;
     if (!Array.isArray(orders)) throw new Error("Unexpected response shape — not an orders array");
 
-    // Stop at cutoff — orders are DESC so once oldest on page is before cutoff we're done
     if (cutoff > 0) {
-      const newOrders = orders.filter(o => (o.createdAtMillis || 0) >= cutoff);
+      const newOrders = orders.filter(o => (o.createdAtMillis || 0) > cutoff);
       allOrders.push(...newOrders);
-      info(`Order history page ${page}: ${orders.length} orders, ${newOrders.length} within range`);
-      if (newOrders.length < orders.length) break; // hit the cutoff
+      info(`Order history page ${page}: ${orders.length} orders, ${newOrders.length} new`);
+      // Found the boundary (or page was empty) — no need to fetch further pages.
+      if (newOrders.length < orders.length) break;
     } else {
       allOrders.push(...orders);
       info(`Order history page ${page}: ${orders.length} orders`);
@@ -353,6 +390,10 @@ async function fetchViaOrderHistory(requestLocale = "en-US") {
   logDump("FULL order history titles (sorted)", [...titles].sort((a, b) => a.localeCompare(b)));
   await chrome.storage.local.set({ epicOrderLastScan: Date.now() });
   return titles;
+
+  } finally {
+    if (warmupTab) chrome.tabs.remove(warmupTab.id).catch(() => {});
+  }
 }
 
 // ── Catalog API: resolve titles for records with sandboxName "Live" ───────
@@ -492,6 +533,19 @@ async function doScan(authFromPage, accountIdFromPage) {
     try {
       const titles = await method.fn();
       const games = [...new Set(titles)].filter(g => g && g.length > 1);
+      if (games.length === 0) {
+        // 0 results from an incremental scan means no new purchases — not a failure.
+        // If we already have Epic games saved, the library is current; skip remaining methods.
+        const stored = await chrome.storage.local.get(LIBRARY_KEY);
+        const epicGames = (stored[LIBRARY_KEY] || []).filter(g => g.source === "epic");
+        if (epicGames.length > 0) {
+          info(`${method.name} returned 0 new titles — library already up to date (${epicGames.length} Epic games)`);
+          await chrome.storage.local.set({ epicLastScan: Date.now() });
+          return { games: epicGames, total: epicGames.length, added: 0, method: method.name, logs: [...logs] };
+        }
+        info(`${method.name} returned 0 titles — no existing library, trying next method`);
+        continue;
+      }
       info(`SUCCESS via ${method.name} — ${games.length} unique games`);
       const { total, added } = await saveGames(games, "epic");
       return { games, total, added, method: method.name, logs: [...logs] };
@@ -513,7 +567,10 @@ async function fetchNamesFromProfilePage(steamId) {
   try {
     const url = `https://steamcommunity.com/profiles/${steamId}/games/?tab=all&sort=name&l=english`;
     info("Profile page: opening", url);
-    bgTab = await chrome.tabs.create({ url, active: false });
+    // active: true gives the tab a real viewport so window.innerHeight is valid and
+    // React virtual lists actually re-render on scroll. Background tabs are throttled
+    // and scrollTo has no effect, making the scraper miss most games.
+    bgTab = await chrome.tabs.create({ url, active: true });
 
     // Wait for the page to fully load
     await new Promise((resolve, reject) => {
@@ -869,16 +926,30 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "doScan") {
+    chrome.storage.local.set({ epicScanInProgress: true, epicScanStartedAt: Date.now() });
     doScan(msg.authToken || null, msg.accountId || null)
-      .then(result => sendResponse({ success: true, ...result }))
-      .catch(err => sendResponse({ success: false, error: err.message || String(err), logs: err.logs || logs }));
+      .then(result => {
+        sendResponse({ success: true, ...result });
+        chrome.storage.local.remove(["epicScanInProgress", "epicScanStartedAt"]);
+      })
+      .catch(err => {
+        sendResponse({ success: false, error: err.message || String(err), logs: err.logs || logs });
+        chrome.storage.local.remove(["epicScanInProgress", "epicScanStartedAt"]);
+      });
     return true; // async
   }
 
   if (msg.action === "doSteamScan") {
+    chrome.storage.local.set({ steamScanInProgress: true, steamScanStartedAt: Date.now() });
     doSteamScan()
-      .then(result => sendResponse({ success: true, ...result }))
-      .catch(err => sendResponse({ success: false, error: err.message || String(err), logs: err.logs || logs }));
+      .then(result => {
+        sendResponse({ success: true, ...result });
+        chrome.storage.local.remove(["steamScanInProgress", "steamScanStartedAt"]);
+      })
+      .catch(err => {
+        sendResponse({ success: false, error: err.message || String(err), logs: err.logs || logs });
+        chrome.storage.local.remove(["steamScanInProgress", "steamScanStartedAt"]);
+      });
     return true;
   }
 

@@ -1,4 +1,4 @@
-// content_epic.js v1.6.0
+// content_epic.js v1.7.0
 // Runs on epicgames.com pages.
 // Its ONLY job: extract auth tokens/account ID from the page and send to background.
 // All network calls happen in background.js (no CORS there).
@@ -123,7 +123,7 @@
     }
   });
 
-  console.log("[AO] v1.6.0 content script ready on", location.hostname);
+  console.log("[AO] v1.7.0 content script ready on", location.hostname);
 
   // ── Badge on Epic store game pages ────────────────────────────────────────
   const ELS_DISMISSED_KEY = "epicDismissedMatches";
