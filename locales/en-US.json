@@ -89,5 +89,7 @@
   "badge_partial": "Title match",
   "badge_fuzzy": "Likely match",
   "badge_dismiss": "Dismiss",
-  "footer_info": "Matching by title similarity"
+  "footer_info": "Matching by title similarity",
+  "whatsnew_title": "What's New in v{v}",
+  "whatsnew_body": "Fixed Epic library scanning — Epic changed their store which had broken scans — plus improved Epic sign-in detection."
 }

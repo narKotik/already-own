@@ -89,5 +89,7 @@
   "badge_partial": "Başlık eşleşmesi",
   "badge_fuzzy": "Olası eşleşme",
   "badge_dismiss": "Kapat",
-  "footer_info": "Başlık benzerliğine göre eşleştirme"
+  "footer_info": "Başlık benzerliğine göre eşleştirme",
+  "whatsnew_title": "v{v} sürümünde yenilikler",
+  "whatsnew_body": "Epic kütüphane taraması düzeltildi — Epic mağazasını değiştirdiği için taramalar bozulmuştu — ayrıca Epic oturum açma algılaması iyileştirildi."
 }

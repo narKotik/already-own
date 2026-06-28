@@ -1,5 +1,5 @@
 // content_steam.js — Runs on Steam store app pages
-// Checks if current game is in your Epic library and injects a badge
+// Checks if current game is in your library (Epic or other sources) and injects a badge
 
 (function () {
   "use strict";
@@ -89,8 +89,8 @@
     );
   }
 
-  // ── Inject the "You own this on Epic" badge ───────────────────────────────
-  function injectBadge(appId, steamTitle, epicTitle, confidence, strings) {
+  // ── Inject the "You own this" badge ───────────────────────────────────────
+  function injectBadge(appId, steamTitle, matchedTitle, matchedSource, confidence, strings) {
     if (document.getElementById("els-epic-badge")) return;
 
     const buyArea =
@@ -104,21 +104,29 @@
     const badge = document.createElement("div");
     badge.id = "els-epic-badge";
 
+    // Show the real source: Epic-branded for "epic", neutral "in your library"
+    // for "other" (and any future source) instead of mislabeling it as Epic.
+    const isEpic = matchedSource === "epic";
+    const titleKey = isEpic ? "badge_own_epic" : "badge_own_library";
+    const accent   = isEpic ? "#0078f2" : "#6e7681";
+    const glow     = isEpic ? "rgba(0,120,242,.25)" : "rgba(0,0,0,.3)";
+    const logoHtml = isEpic
+      ? `<svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 2C8.268 2 2 8.268 2 16s6.268 14 14 14 14-6.268 14-14S23.732 2 16 2z" fill="#0078f2"/>
+            <path d="M10 11h12v2.5H13v2h8v2.5h-8v2H22V22.5H10V11z" fill="white"/>
+          </svg>`
+      : `<div style="font-size:24px;line-height:1;">🎮</div>`;
+
     const confidenceKey = confidence === "exact" ? "badge_exact" : confidence === "partial" ? "badge_partial" : "badge_fuzzy";
     const confidenceLabel = tr(strings, confidenceKey);
     const confidenceColor = confidence === "exact" ? "#00c853" : confidence === "partial" ? "#00b0ff" : "#ff9800";
 
     badge.innerHTML = `
       <div id="els-badge-inner">
-        <div id="els-badge-logo">
-          <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 2C8.268 2 2 8.268 2 16s6.268 14 14 14 14-6.268 14-14S23.732 2 16 2z" fill="#0078f2"/>
-            <path d="M10 11h12v2.5H13v2h8v2.5h-8v2H22V22.5H10V11z" fill="white"/>
-          </svg>
-        </div>
+        <div id="els-badge-logo">${logoHtml}</div>
         <div id="els-badge-text">
-          <span id="els-badge-title">${escHtml(tr(strings, "badge_own_epic"))}</span>
-          <span id="els-badge-sub">"${escHtml(epicTitle)}" · <span style="color:${confidenceColor}">${escHtml(confidenceLabel)}</span></span>
+          <span id="els-badge-title">${escHtml(tr(strings, titleKey))}</span>
+          <span id="els-badge-sub">"${escHtml(matchedTitle)}" · <span style="color:${confidenceColor}">${escHtml(confidenceLabel)}</span></span>
         </div>
         <div id="els-badge-close" title="${escHtml(tr(strings, "badge_dismiss"))}">✕</div>
       </div>
@@ -128,8 +136,8 @@
     style.textContent = `
       #els-epic-badge { margin:12px 0; padding:0; font-family:'Motiva Sans',Arial,sans-serif; animation:elsBadgeIn .4s cubic-bezier(.175,.885,.32,1.275) both; }
       @keyframes elsBadgeIn { from{opacity:0;transform:scale(.92) translateY(-6px)} to{opacity:1;transform:scale(1) translateY(0)} }
-      #els-badge-inner { display:flex; align-items:center; gap:12px; background:linear-gradient(135deg,#0d1b2a,#1a2d45); border:1px solid #0078f2; border-left:4px solid #0078f2; border-radius:8px; padding:12px 16px; box-shadow:0 2px 16px rgba(0,120,242,.25),inset 0 1px 0 rgba(255,255,255,.05); position:relative; }
-      #els-badge-logo { flex-shrink:0; filter:drop-shadow(0 0 6px rgba(0,120,242,.5)); }
+      #els-badge-inner { display:flex; align-items:center; gap:12px; background:linear-gradient(135deg,#0d1b2a,#1a2d45); border:1px solid ${accent}; border-left:4px solid ${accent}; border-radius:8px; padding:12px 16px; box-shadow:0 2px 16px ${glow},inset 0 1px 0 rgba(255,255,255,.05); position:relative; }
+      #els-badge-logo { flex-shrink:0; filter:drop-shadow(0 0 6px ${glow}); }
       #els-badge-text { flex:1; display:flex; flex-direction:column; gap:3px; }
       #els-badge-title { color:#fff; font-size:14px; font-weight:700; letter-spacing:.01em; }
       #els-badge-sub { color:#8ba3be; font-size:11px; }
@@ -142,8 +150,8 @@
       if (appId) {
         chrome.storage.local.get(DISMISSED_KEY, (r) => {
           const list = r[DISMISSED_KEY] || [];
-          if (!list.some(d => (d.pageId ?? d.appId) === appId && (d.matchedTitle ?? d.epicTitle) === epicTitle)) {
-            list.push({ pageId: appId, pageStore: "steam", pageTitle: steamTitle, matchedTitle: epicTitle });
+          if (!list.some(d => (d.pageId ?? d.appId) === appId && (d.matchedTitle ?? d.epicTitle) === matchedTitle)) {
+            list.push({ pageId: appId, pageStore: "steam", pageTitle: steamTitle, matchedTitle });
             chrome.storage.local.set({ [DISMISSED_KEY]: list });
           }
         });
@@ -166,21 +174,24 @@
     const strings  = await loadLocale(settings.uiLocale);
 
     const library = stored[LIBRARY_KEY] || [];
-    const candidates0 = library.filter(g => g.source === "epic" || g.source === "other").map(g => g.title);
-    if (candidates0.length === 0) return;
+    const entries = library.filter(g => g.source === "epic" || g.source === "other");
+    if (entries.length === 0) return;
 
     const dismissed = stored[DISMISSED_KEY] || [];
     const dismissedTitles = new Set(
       dismissed.filter(d => (d.pageId ?? d.appId) === appId).map(d => d.matchedTitle ?? d.epicTitle)
     );
-    const candidates = candidates0.filter(t => !dismissedTitles.has(t));
+    const candidates = entries.filter(g => !dismissedTitles.has(g.title));
     if (candidates.length === 0) return;
 
     const steamTitle = getSteamTitle();
     if (!steamTitle) return;
 
-    const { match, epicTitle, confidence } = isMatch(steamTitle, candidates, settings);
-    if (match) injectBadge(appId, steamTitle, epicTitle, confidence, strings);
+    const { match, epicTitle, confidence } = isMatch(steamTitle, candidates.map(g => g.title), settings);
+    if (match) {
+      const matchedSource = candidates.find(g => g.title === epicTitle)?.source || "other";
+      injectBadge(appId, steamTitle, epicTitle, matchedSource, confidence, strings);
+    }
   }
 
   if (document.readyState === "complete") {

@@ -89,5 +89,7 @@
   "badge_partial": "Dopasowanie tytułu",
   "badge_fuzzy": "Prawdopodobne dopasowanie",
   "badge_dismiss": "Odrzuć",
-  "footer_info": "Dopasowywanie według podobieństwa tytułu"
+  "footer_info": "Dopasowywanie według podobieństwa tytułu",
+  "whatsnew_title": "Co nowego w v{v}",
+  "whatsnew_body": "Naprawiono skanowanie biblioteki Epic — Epic zmienił swój sklep, co psuło skanowanie — oraz ulepszono wykrywanie logowania do Epic."
 }

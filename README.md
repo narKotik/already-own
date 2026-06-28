@@ -6,7 +6,7 @@ If you find it useful: [☕ Buy me a coffee](https://ko-fi.com/aleadyown)
 
 ## Features
 
-- **📚 Epic Library Scanner** — Reads your owned games from the Epic Games Store
+- **📚 Epic Library Scanner** — Reads your purchased games from your Epic Games Store order history
 - **🎮 Steam Library Scanner** — Reads your full Steam library via your Community profile page
 - **🏷️ Store Badges** — Shows a "You already own this!" badge near the buy button on Steam and Epic store pages
 - **🔍 Fuzzy Matching** — Handles title differences (subtitles, punctuation, trademark symbols, etc.)
@@ -128,7 +128,9 @@ Enable **Debug logs** (checkbox at the bottom of the popup), run a scan, then op
 
 ## Limitations
 
-- **DLC appears as separate entries** — Epic's API returns DLC packs as individual items, so your count will often be higher than the base game count in the launcher. Use the ignore list to hide DLC.
+- **Scanning is based on your Epic purchase history** — the extension reads your order history, so each saved entry reflects a purchased item rather than what's installed in the launcher. Two consequences:
+  - **Bundles show as one entry** — a trilogy or bundle bought in a single order appears under the bundle's name (e.g. "Batman: Arkham Collection"), not as the individual games, so it may not match the separate titles on Steam.
+  - **DLC and add-ons appear as separate entries** — DLC bought on its own is its own line item, so your count can differ from the base-game count in the launcher. Use the ignore list to hide entries you don't want.
 - **Private Steam profile** — if your Steam games list is private, the fast profile-page scan falls back to the slower `appdetails` API, which is rate-limited.
 - **Steam scan rate limit** — the `appdetails` API fallback is rate-limited by Steam. Scanning too frequently may temporarily block those requests. If Steam store pages stop loading correctly, wait a few minutes.
 - **Title mismatches** — games with very different names on Epic vs Steam (regional differences, publisher renames) may not match.

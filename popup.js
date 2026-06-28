@@ -61,18 +61,19 @@ const preferRicher = (a, b) => (/[™®©]/.test(b) && !/[™®©]/.test(a)) ? b
 
 // ── i18n ──────────────────────────────────────────────────────────────────
 async function loadI18n(locale) {
+  // Always load en-US as a base layer so any key missing from a translated
+  // locale falls back to English instead of showing the raw key name.
+  let base = {};
+  try { base = await fetch(chrome.runtime.getURL("locales/en-US.json")).then(r => r.json()); } catch { /* */ }
+
+  if (locale === "en-US") { i18n = base; return; }
+
   try {
-    const url = chrome.runtime.getURL(`locales/${locale}.json`);
-    const r = await fetch(url);
+    const r = await fetch(chrome.runtime.getURL(`locales/${locale}.json`));
     if (!r.ok) throw new Error(r.status);
-    i18n = await r.json();
+    i18n = { ...base, ...(await r.json()) };
   } catch {
-    if (locale !== "en-US") {
-      try {
-        const url = chrome.runtime.getURL("locales/en-US.json");
-        i18n = await fetch(url).then(r => r.json());
-      } catch { i18n = {}; }
-    }
+    i18n = base;
   }
 }
 
@@ -91,6 +92,9 @@ function applyI18n() {
   });
   document.getElementById("ignored-hint-text").textContent = t("lib_ignored_hint");
   document.getElementById("dismissed-hint-text").textContent = t("lib_dismissed_hint");
+  // What's New banner uses {v} interpolation, so it can't be a plain data-i18n
+  // element — re-apply its text on every locale change while it's visible.
+  if (document.getElementById("whatsnew")?.style.display === "flex") setWhatsNewText();
   // Scan button labels depend on auth state, not data-i18n attributes
   setAuthState(hasAuth);
   setSteamAuthState(hasSteamAuth);
@@ -396,7 +400,7 @@ btnClear.addEventListener("click", () => clearConfirm.classList.add("visible"));
 document.getElementById("btn-clear-no").addEventListener("click", () => clearConfirm.classList.remove("visible"));
 document.getElementById("btn-clear-yes").addEventListener("click", () => {
   clearConfirm.classList.remove("visible");
-  chrome.storage.local.remove([LIBRARY_KEY, "epicLastScan", "steamLastScan"], () => { allGames = []; loadData(); });
+  chrome.storage.local.remove([LIBRARY_KEY, "epicLastScan", "steamLastScan", "epicOrderLastScan"], () => { allGames = []; loadData(); });
 });
 
 // ── Export / Import ───────────────────────────────────────────────────────
@@ -407,7 +411,7 @@ function setLibStatus(msg, type = "", duration = 3000) {
 }
 
 btnExport.addEventListener("click", () => {
-  const data = { version: 2, exported: new Date().toISOString(), games: allGames, ignored: allIgnored };
+  const data = { version: 2, exported: new Date().toISOString(), games: allGames, ignored: allIgnored, dismissed: allDismissed };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -667,6 +671,28 @@ document.getElementById("btn-s-confirm-yes").addEventListener("click", () => {
   pendingClearAction = null;
 });
 
+// ── What's New banner ─────────────────────────────────────────────────────
+const CURRENT_VERSION = "1.7.1";
+function setWhatsNewText() {
+  document.getElementById("whatsnew-title").textContent = t("whatsnew_title", { v: CURRENT_VERSION });
+  document.getElementById("whatsnew-body").textContent  = t("whatsnew_body");
+}
+function maybeShowWhatsNew() {
+  // Clear the toolbar "NEW" badge now that the popup is open.
+  chrome.action.setBadgeText({ text: "" });
+  chrome.storage.local.get(["updatedToVersion", "whatsNewSeen"], (r) => {
+    // Show only when an update flagged the current version and the user
+    // hasn't dismissed this version's note yet.
+    if (r.updatedToVersion !== CURRENT_VERSION || r.whatsNewSeen === CURRENT_VERSION) return;
+    setWhatsNewText();
+    document.getElementById("whatsnew").style.display = "flex";
+  });
+}
+document.getElementById("whatsnew-close").addEventListener("click", () => {
+  document.getElementById("whatsnew").style.display = "none";
+  chrome.storage.local.set({ whatsNewSeen: CURRENT_VERSION });
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────
 async function init() {
   const settings = await loadSettings();
@@ -675,6 +701,7 @@ async function init() {
   applySettingsToUI(settings);
   applyDebugState(settings.debugLogs);
   loadData();
+  maybeShowWhatsNew();
   chrome.runtime.sendMessage({ action: "checkAuth" },      (r) => setAuthState(!!r?.hasAuth));
   chrome.runtime.sendMessage({ action: "checkSteamAuth" }, (r) => setSteamAuthState(!!r?.hasAuth));
 

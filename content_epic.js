@@ -1,4 +1,4 @@
-// content_epic.js v1.7.0
+// content_epic.js v1.7.1
 // Runs on epicgames.com pages.
 // Its ONLY job: extract auth tokens/account ID from the page and send to background.
 // All network calls happen in background.js (no CORS there).
@@ -123,7 +123,7 @@
     }
   });
 
-  console.log("[AO] v1.7.0 content script ready on", location.hostname);
+  console.log("[AO] v1.7.1 content script ready on", location.hostname);
 
   // ── Badge on Epic store game pages ────────────────────────────────────────
   const ELS_DISMISSED_KEY = "epicDismissedMatches";
@@ -239,51 +239,115 @@
 
     const ctaBtn = buyArea.querySelector('[data-testid="purchase-cta-button"]');
     if (ctaBtn) {
-      const sidebarContent = buyArea.firstElementChild ?? buyArea;
-      let ctaBlock = ctaBtn.parentElement;
-      while (ctaBlock && ctaBlock.parentElement !== sidebarContent) {
-        ctaBlock = ctaBlock.parentElement;
+      // Walk up just 3 levels max from the button to find a block-level row to insert before
+      let anchor = ctaBtn;
+      for (let i = 0; i < 3; i++) {
+        if (anchor.parentElement && anchor.parentElement !== buyArea) anchor = anchor.parentElement;
+        else break;
       }
-      if (ctaBlock) {
-        const anchor = ctaBlock.previousElementSibling ?? ctaBlock;
-        anchor.insertAdjacentElement("beforebegin", badge);
-      } else {
-        sidebarContent.insertAdjacentElement("afterbegin", badge);
-      }
+      anchor.insertAdjacentElement("beforebegin", badge);
     } else {
       (buyArea.firstElementChild ?? buyArea).insertAdjacentElement("afterbegin", badge);
     }
   }
 
-  async function runEpicBadge() {
-    if (!/\/p\//i.test(location.pathname)) return;
-    const slug = getEpicSlug();
+  // Per-page match cache, keyed by slug, so we don't re-read storage on every
+  // DOM mutation. _aoResult: undefined = not yet computed, null = no match for
+  // this page, object = a confirmed match ready to render.
+  let _aoSlug = null;
+  let _aoResult = undefined;
+  let _aoStrings = null;
+  let _aoComputing = false;
 
+  async function _computeEpicMatch(slug) {
     const stored = await new Promise(r => chrome.storage.local.get([SETTINGS_KEY, LIBRARY_KEY, ELS_DISMISSED_KEY], r));
     const settings = { ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] ?? {}) };
-    const strings  = await loadLocale(settings.uiLocale);
+    _aoStrings = await loadLocale(settings.uiLocale);
 
     const library = stored[LIBRARY_KEY] || [];
     const entries = library.filter(g => g.source === "steam" || g.source === "other");
-    if (entries.length === 0) return;
+    if (entries.length === 0) return null;
 
     const dismissed = stored[ELS_DISMISSED_KEY] || [];
     const dismissedTitles = new Set(
       dismissed.filter(d => d.pageId === slug && d.pageStore === "epic").map(d => d.matchedTitle)
     );
     const candidates = entries.filter(g => !dismissedTitles.has(g.title));
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) return null;
 
     const pageTitle = getEpicGameTitle();
-    if (!pageTitle) return;
+    if (!pageTitle) return undefined; // title not rendered yet — retry on next tick
 
     const { match, matchedTitle, confidence } = elsIsMatch(pageTitle, candidates.map(g => g.title), settings);
-    if (match) {
-      const matchedSource = candidates.find(g => g.title === matchedTitle)?.source || "other";
-      injectEpicBadge(slug, pageTitle, matchedTitle, matchedSource, confidence, strings);
+    if (!match) return null;
+    const matchedSource = candidates.find(g => g.title === matchedTitle)?.source || "other";
+    return { slug, pageTitle, matchedTitle, matchedSource, confidence };
+  }
+
+  // Idempotent reconciler: makes the DOM match the desired state. Safe to call
+  // as often as we like — it injects only when needed and re-injects if Epic's
+  // SPA re-render removes our badge.
+  async function reconcileEpicBadge() {
+    if (!/\/p\//i.test(location.pathname)) {
+      document.getElementById("els-epic-badge")?.remove();
+      _aoSlug = null; _aoResult = undefined;
+      return;
+    }
+
+    const slug = getEpicSlug();
+    if (slug !== _aoSlug) {
+      // Navigated to a different product — reset cache and clear any old badge.
+      _aoSlug = slug;
+      _aoResult = undefined;
+      document.getElementById("els-epic-badge")?.remove();
+    }
+
+    if (_aoResult === null) return;                          // known no-match
+    if (document.getElementById("els-epic-badge")) return;   // already placed
+    // Wait for the buy button so the badge always lands right above it
+    // (identical placement to a fresh page load).
+    if (!document.querySelector('[data-testid="purchase-cta-button"]')) return;
+
+    if (_aoResult === undefined) {
+      if (_aoComputing) return;
+      _aoComputing = true;
+      try { _aoResult = await _computeEpicMatch(slug); }
+      finally { _aoComputing = false; }
+      if (slug !== _aoSlug) return;          // navigated away mid-compute
+      if (_aoResult === undefined) return;   // title still not ready — retry later
+    }
+
+    if (_aoResult && _aoResult.slug === _aoSlug && !document.getElementById("els-epic-badge")) {
+      injectEpicBadge(_aoResult.slug, _aoResult.pageTitle, _aoResult.matchedTitle,
+                      _aoResult.matchedSource, _aoResult.confidence, _aoStrings);
     }
   }
 
-  if (document.readyState === "complete") { runEpicBadge(); }
-  else { window.addEventListener("load", runEpicBadge); }
+  // Epic is a SPA whose product pages render (and re-render) asynchronously.
+  // A content script lives in an isolated world, so patching history.pushState
+  // here would NOT catch the page's own navigation. Instead we drive the
+  // reconciler from three sources:
+  //   1. a debounced MutationObserver — catches late renders AND re-injects if
+  //      a React re-render removes our badge,
+  //   2. a URL poll — catches navigation between product pages,
+  //   3. popstate — back/forward navigation.
+  let _reconcileTimer = null;
+  function _scheduleReconcile() {
+    clearTimeout(_reconcileTimer);
+    _reconcileTimer = setTimeout(() => { reconcileEpicBadge(); }, 150);
+  }
+
+  const _observer = new MutationObserver(_scheduleReconcile);
+  function _startObserver() {
+    if (document.body) _observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  setInterval(reconcileEpicBadge, 800);
+  window.addEventListener("popstate", _scheduleReconcile);
+
+  if (document.body) _startObserver();
+  else window.addEventListener("DOMContentLoaded", _startObserver);
+
+  if (document.readyState === "complete") { reconcileEpicBadge(); }
+  else { window.addEventListener("load", reconcileEpicBadge); }
 })();

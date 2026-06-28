@@ -89,5 +89,7 @@
   "badge_partial": "Correspondência de título",
   "badge_fuzzy": "Correspondência provável",
   "badge_dismiss": "Dispensar",
-  "footer_info": "Correspondência por similaridade de título"
+  "footer_info": "Correspondência por similaridade de título",
+  "whatsnew_title": "Novidades na v{v}",
+  "whatsnew_body": "Corrigido o escaneamento da biblioteca Epic — a Epic mudou a loja, o que quebrava o escaneamento — e melhorada a detecção de login na Epic."
 }

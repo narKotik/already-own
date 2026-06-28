@@ -99,6 +99,14 @@
     .game-del { color:var(--muted); font-size:11px; cursor:pointer; padding:2px 4px; border-radius:3px; border:none; background:none; line-height:1; }
     .game-del:hover { color:var(--red); background:rgba(248,81,73,.1); }
     .empty-state { padding:20px; text-align:center; font-size:11px; color:var(--muted); }
+    /* What's New banner */
+    .whatsnew { display:flex; align-items:flex-start; gap:10px; margin:0 0 8px; padding:10px 12px; background:linear-gradient(135deg,#0d1b2a,#13283f); border:1px solid var(--border); border-left:3px solid var(--epic); border-radius:6px; }
+    .whatsnew-icon { font-size:16px; line-height:1.3; flex-shrink:0; }
+    .whatsnew-text { flex:1; display:flex; flex-direction:column; gap:2px; }
+    .whatsnew-title { font-size:12px; font-weight:700; color:#fff; }
+    .whatsnew-body { font-size:11px; color:#8ba3be; line-height:1.4; }
+    .whatsnew-close { color:#4a6580; font-size:11px; cursor:pointer; padding:2px 4px; border-radius:4px; flex-shrink:0; line-height:1; transition:color .2s,background .2s; }
+    .whatsnew-close:hover { color:#fff; background:rgba(255,255,255,.1); }
     .lib-footer { display:flex; align-items:center; justify-content:space-between; }
     .lib-count { font-size:10px; color:var(--muted); }
     .btn-clear-lib { font-size:10px; color:var(--red); background:none; border:none; cursor:pointer; font-family:inherit; padding:2px 4px; border-radius:4px; }
@@ -162,7 +170,7 @@
     <div class="header-name">Already Own?</div>
     <div class="header-sub" data-i18n="header_sub">Epic &amp; Steam ownership checker</div>
   </div>
-  <div class="header-ver">v1.7.0</div>
+  <div class="header-ver">v1.7.1</div>
 </div>
 
 <div class="tabs">
@@ -174,6 +182,14 @@
 
 <!-- LIBRARY TAB -->
 <div class="panel active" id="tab-library">
+  <div class="whatsnew" id="whatsnew" style="display:none;">
+    <div class="whatsnew-icon">✨</div>
+    <div class="whatsnew-text">
+      <span class="whatsnew-title" id="whatsnew-title"></span>
+      <span class="whatsnew-body" id="whatsnew-body"></span>
+    </div>
+    <div class="whatsnew-close" id="whatsnew-close" title="Dismiss">✕</div>
+  </div>
   <div class="lib-toolbar">
     <div class="lib-search-wrap">
       <input class="lib-search" id="lib-search" data-i18n-ph="lib_search_ph" placeholder="Search games…" autocomplete="off" />

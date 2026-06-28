@@ -89,5 +89,7 @@
   "badge_partial": "Coincidencia de título",
   "badge_fuzzy": "Coincidencia probable",
   "badge_dismiss": "Descartar",
-  "footer_info": "Coincidencia por similitud de título"
+  "footer_info": "Coincidencia por similitud de título",
+  "whatsnew_title": "Novedades en v{v}",
+  "whatsnew_body": "Se corrigió el escaneo de la biblioteca de Epic — Epic cambió su tienda, lo que rompía los escaneos — y se mejoró la detección de inicio de sesión en Epic."
 }

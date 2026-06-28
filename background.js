@@ -1,10 +1,10 @@
-// background.js v1.7.0
+// background.js v1.7.1
 // ALL network requests happen here — service workers are not subject to CORS.
 // The content script just grabs auth tokens from the page and sends them here.
 
 const LIBRARY_KEY = "elsLibrary";   // [{title, source}]  source: "epic"|"steam"|"other"
 const IGNORE_KEY  = "elsIgnoredGames"; // [{title, source}]
-const VERSION = "1.7.0";
+const VERSION = "1.7.1";
 let DEBUG = false; // set true (or via Debug logs checkbox in popup) to enable full title-list dumps
 
 // ── Logger ────────────────────────────────────────────────────────────────
@@ -247,102 +247,124 @@ async function fetchViaLibraryAPI(authToken) {
   return uniqueTitles;
 }
 
+// Resolve once a tab reaches "complete" (or after a timeout).
+function _waitForTabComplete(tabId, timeoutMs = 20000) {
+  return new Promise((resolve) => {
+    const tid = setTimeout(() => { chrome.tabs.onUpdated.removeListener(fn); resolve(); }, timeoutMs);
+    function fn(id, changeInfo) {
+      if (id !== tabId || changeInfo.status !== "complete") return;
+      chrome.tabs.onUpdated.removeListener(fn);
+      clearTimeout(tid);
+      resolve();
+    }
+    chrome.tabs.onUpdated.addListener(fn);
+  });
+}
+
 // ── Order history API ─────────────────────────────────────────────────────
 async function fetchViaOrderHistory(requestLocale = "en-US") {
   const BASE = "https://accounts.epicgames.com/account/v2/payment/ajaxGetOrderHistory";
 
-  // The order history endpoint lives on accounts.epicgames.com and requires a session
-  // cookie scoped to that subdomain — separate from store.epicgames.com cookies.
-  // Pre-warm the session by loading the accounts page in a background tab first,
-  // exactly like the Steam relay does for store.steampowered.com.
-  let warmupTab = null;
-  try {
-    const existingTabs = await chrome.tabs.query({ url: "https://accounts.epicgames.com/*" });
-    if (existingTabs.length > 0) {
-      info("Order history: accounts.epicgames.com tab already open — session should be active");
-    } else {
-      info("Order history: opening background tab to warm up accounts.epicgames.com session");
-      warmupTab = await chrome.tabs.create({ url: "https://accounts.epicgames.com/account/personal", active: false });
-      await new Promise((resolve) => {
-        const tid = setTimeout(() => {
-          chrome.tabs.onUpdated.removeListener(fn);
-          resolve();
-        }, 15000);
-        function fn(tabId, changeInfo) {
-          if (tabId !== warmupTab.id || changeInfo.status !== "complete") return;
-          chrome.tabs.onUpdated.removeListener(fn);
-          clearTimeout(tid);
-          resolve();
-        }
-        chrome.tabs.onUpdated.addListener(fn);
-      });
-      info("Order history: accounts page loaded");
-    }
-  } catch (e) {
-    warn("Order history: session warm-up failed", e.message);
-  }
-
-  try {
-
-  // Incremental strategy: always fetch page 1, then decide whether to continue.
-  // Orders are returned DESC (newest first).
-  //   - Page has 0 new orders      → nothing changed since last scan, stop.
-  //   - Page has some new, some old → took everything new, found the boundary, stop.
-  //   - Page is entirely new orders → there may be more on the next page, keep going.
-  // This also recovers from a failed previous scan: if epicOrderLastScan is set but
-  // the save didn't complete, the next scan re-fetches everything newer than that stamp.
+  // The order-history API uses a first-party session on accounts.epicgames.com.
+  // A service-worker fetch from the extension origin does NOT send that session
+  // (the request is 302-redirected to the login flow at the bare epicgames.com
+  // domain, which then fails CORS). So we run the fetch INSIDE an
+  // accounts.epicgames.com page — same-origin to the API — where the browser
+  // attaches the session exactly as it does on a normal visit. Same approach as
+  // the Steam GetAppList relay.
   const { epicOrderLastScan } = await chrome.storage.local.get("epicOrderLastScan");
   const cutoff = epicOrderLastScan || 0;
-  info(`Order history: ${cutoff > 0 ? `incremental (since ${new Date(cutoff).toISOString().slice(0,10)})` : "full scan"}`, BASE);
+  info(`Order history: ${cutoff > 0 ? `incremental (since ${new Date(cutoff).toISOString().slice(0,10)})` : "full scan"} — relaying via accounts.epicgames.com tab`, BASE);
 
-  const allOrders = [];
-  let nextPageToken = null;
-  let page = 0;
+  let createdTab = null;
+  let allOrders = [];
 
-  while (true) {
-    const url = new URL(BASE);
-    url.searchParams.set("count", "100");
-    url.searchParams.set("sortDir", "DESC");
-    url.searchParams.set("sortBy", "DATE");
-    url.searchParams.set("locale", requestLocale);
-    if (nextPageToken) url.searchParams.set("nextPageToken", nextPageToken);
-
-    const resp = await fetch(url.toString(), { credentials: "include" });
-    info(`Order history HTTP status (page ${page})`, resp.status);
-    if (resp.status === 401 || resp.status === 403) {
-      throw new Error(`HTTP ${resp.status}: Not authenticated — open accounts.epicgames.com in Chrome and sign in`);
-    }
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => "");
-      throw new Error(`HTTP ${resp.status}: ${text.slice(0, 200)}`);
-    }
-
-    const json = await resp.json();
-    const orders = json?.orders;
-    if (!Array.isArray(orders)) throw new Error("Unexpected response shape — not an orders array");
-
-    if (cutoff > 0) {
-      const newOrders = orders.filter(o => (o.createdAtMillis || 0) > cutoff);
-      allOrders.push(...newOrders);
-      info(`Order history page ${page}: ${orders.length} orders, ${newOrders.length} new`);
-      // Found the boundary (or page was empty) — no need to fetch further pages.
-      if (newOrders.length < orders.length) break;
+  try {
+    // Find a live accounts tab, or open one in the background.
+    let tabId = null;
+    const existingTabs = await chrome.tabs.query({ url: "https://accounts.epicgames.com/*" });
+    if (existingTabs.length > 0) {
+      tabId = existingTabs[0].id;
+      info("Order history: relaying through existing accounts.epicgames.com tab");
     } else {
-      allOrders.push(...orders);
-      info(`Order history page ${page}: ${orders.length} orders`);
+      info("Order history: opening accounts.epicgames.com tab for relay");
+      createdTab = await chrome.tabs.create({ url: "https://accounts.epicgames.com/account/personal", active: false });
+      tabId = createdTab.id;
+      await _waitForTabComplete(tabId);
+      // Let the page finish establishing/refreshing its session after load.
+      await new Promise(r => setTimeout(r, 1500));
     }
 
-    nextPageToken = json?.nextPageToken || null;
-    if (!nextPageToken || orders.length === 0) break;
+    // Run the paginated fetch in the page context. credentials:"include" sends
+    // the first-party session; redirect:"manual" lets us detect the login bounce
+    // (opaqueredirect) instead of throwing a CORS error.
+    const pageFetch = async (locale, since) => {
+        const API = "https://accounts.epicgames.com/account/v2/payment/ajaxGetOrderHistory";
+        const collected = [];
+        const diag = [];
+        let token = null, page = 0;
+        try {
+          while (true) {
+            const u = new URL(API);
+            u.searchParams.set("count", "10");
+            u.searchParams.set("sortDir", "DESC");
+            u.searchParams.set("sortBy", "DATE");
+            u.searchParams.set("locale", locale);
+            if (token) u.searchParams.set("nextPageToken", token);
+            const r = await fetch(u.toString(), { credentials: "include", redirect: "manual", headers: { "Accept": "application/json" } });
+            if (r.type === "opaqueredirect" || r.status === 401 || r.status === 403) return { auth: true, diag };
+            if (!r.ok) return { error: `HTTP ${r.status}`, diag };
+            const j = await r.json();
+            const orders = j && j.orders;
+            if (!Array.isArray(orders)) return { error: "Unexpected response shape — not an orders array", diag };
+            if (since > 0) {
+              const fresh = orders.filter(o => (o.createdAtMillis || 0) > since);
+              collected.push(...fresh);
+              diag.push(`p${page}: ${orders.length} orders, ${fresh.length} new`);
+              if (fresh.length < orders.length) break;
+            } else {
+              collected.push(...orders);
+              diag.push(`p${page}: ${orders.length} orders`);
+            }
+            token = (j && j.nextPageToken) || null;
+            if (!token || orders.length === 0) break;
+            page++;
+            if (page > 200) break;
+            await new Promise(res => setTimeout(res, 400));
+          }
+          return { orders: collected, pages: page + 1, diag };
+        } catch (e) {
+          return { error: String((e && e.message) || e), diag };
+        }
+      };
 
-    page++;
-    if (page > 200) { warn("Order history pagination safety limit reached"); break; }
+    const runRelay = async () => {
+      const relay = await chrome.scripting.executeScript({
+        target: { tabId }, world: "MAIN", args: [requestLocale, cutoff], func: pageFetch,
+      });
+      return relay && relay[0] && relay[0].result;
+    };
 
-    // Delay between pages
-    await new Promise(r => setTimeout(r, 500));
-  }
+    let result = await runRelay();
+    // A freshly opened accounts tab may still be completing its session refresh
+    // (the sessionInvalidated → re-mint flow) when the first fetch fires, which
+    // bounces to login. The page load itself establishes the session, so reload
+    // the tab once and retry — this makes the scan succeed on the first button
+    // click instead of needing a second one.
+    if (result && result.auth && createdTab) {
+      info("Order history: session not ready on first try — reloading accounts tab and retrying");
+      await chrome.tabs.reload(tabId);
+      await _waitForTabComplete(tabId);
+      await new Promise(r => setTimeout(r, 2000));
+      result = await runRelay();
+    }
 
-  info(`Order history: ${allOrders.length} total orders across ${page + 1} page(s)`);
+    if (!result) throw new Error("Order history relay returned no result — accounts page context unavailable");
+    if (result.diag?.length) for (const d of result.diag) info(`Order history ${d}`);
+    if (result.auth) throw new Error("HTTP 401: Not authenticated — open accounts.epicgames.com in Chrome and sign in");
+    if (result.error) throw new Error(result.error);
+    allOrders = result.orders || [];
+    info(`Order history: ${allOrders.length} orders via relay (${result.pages} page(s))`);
 
   // Only EGS purchases — exclude launcher/other merchant groups
   const egsPurchases = allOrders.filter(o => o.orderType === "PURCHASE" && o.merchantGroup === "EGS_MKT");
@@ -392,7 +414,7 @@ async function fetchViaOrderHistory(requestLocale = "en-US") {
   return titles;
 
   } finally {
-    if (warmupTab) chrome.tabs.remove(warmupTab.id).catch(() => {});
+    if (createdTab) chrome.tabs.remove(createdTab.id).catch(() => {});
   }
 }
 
@@ -529,6 +551,7 @@ async function doScan(authFromPage, accountIdFromPage) {
     { name: "Library Service API", fn: () => fetchViaLibraryAPI(authToken) },
   ];
 
+  let authFailed = false;
   for (const method of methods) {
     try {
       const titles = await method.fn();
@@ -551,11 +574,17 @@ async function doScan(authFromPage, accountIdFromPage) {
       return { games, total, added, method: method.name, logs: [...logs] };
     } catch (e) {
       error(`FAILED — ${method.name}: ${e.message}`);
+      if (/401|403|authenticated/i.test(e.message)) authFailed = true;
     }
   }
 
   error("All methods failed");
-  throw { message: "All API methods failed — see Logs tab for details.", logs: [...logs] };
+  throw {
+    message: authFailed
+      ? "Not authenticated — open accounts.epicgames.com in Chrome and sign in, then try again."
+      : "All API methods failed — see Logs tab for details.",
+    logs: [...logs],
+  };
 }
 
 // ── Steam profile page DOM scraper ────────────────────────────────────────
@@ -920,8 +949,15 @@ async function doSteamScan() {
 }
 
 // ── Message listener ──────────────────────────────────────────────────────
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   console.log(`Already Own? v${VERSION} installed`);
+  // On update (not fresh install), flag the new version and ping the toolbar icon.
+  // The popup clears the badge on open and shows a dismissible "What's New" banner.
+  if (details.reason === "update") {
+    chrome.storage.local.set({ updatedToVersion: VERSION });
+    chrome.action.setBadgeText({ text: "NEW" });
+    chrome.action.setBadgeBackgroundColor({ color: "#67c1f5" });
+  }
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -954,6 +990,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.action === "checkAuth") {
+    // Cookie presence is the reliable signal here. A network probe to the
+    // order-history API from the service worker gets redirected to login
+    // (the session is first-party only), so it would always read as "signed
+    // out" even when the user is logged in. The scan itself surfaces real
+    // auth failures via the accounts-tab relay.
     getEpicAuthFromCookies().then(token => sendResponse({ hasAuth: !!token }));
     return true;
   }
