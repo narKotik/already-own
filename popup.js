@@ -492,17 +492,17 @@ function setAuthState(auth) {
   }
 }
 
-btnScan.addEventListener("click", () => {
-  if (!hasAuth) {
-    chrome.tabs.create({ url: "https://store.epicgames.com" });
-    setStatus(t("sign_in_epic"), "warn");
-    scanDesc.textContent = t("sign_in_epic_desc");
-    return;
-  }
+// Start an Epic scan. When we don't have a token yet, the background warms up
+// the web session (opens store.epicgames.com in a background tab and closes it)
+// and then scans in the same run — no second click needed. `warming` only
+// changes the description text shown under the spinner.
+function runEpicScan(warming) {
   epicScanActive = true;
   btnScan.disabled = true;
   scanSpinner.style.display = "block";
   scanLabel.textContent = t("scanning");
+  scanDesc.textContent  = warming ? t("warming_up_epic") : t("scan_resuming_epic");
+  scanDesc.classList.remove("warn");
   setStatus("", "");
 
   chrome.runtime.sendMessage({ action: "doScan", authToken: null, accountId: null }, (response) => {
@@ -522,8 +522,13 @@ btnScan.addEventListener("click", () => {
     if (!response.success) {
       const authErr = response.error?.includes("401") || response.error?.includes("403") || response.error?.includes("authenticated");
       if (authErr) {
+        // Warmup couldn't find a session — the user is genuinely signed out.
+        // Open the store in the foreground so they can sign in, then scan again.
         setAuthState(false);
-        setStatus(t("noauth_epic"), "warn");
+        setStatus(t("sign_in_epic"), "warn");
+        scanDesc.textContent = t("sign_in_epic_desc");
+        scanDesc.classList.add("warn");
+        chrome.tabs.create({ url: "https://store.epicgames.com" });
       } else {
         setAuthState(true);
         setStatus(`❌ ${response.error}`, "err");
@@ -540,7 +545,9 @@ btnScan.addEventListener("click", () => {
       switchTab("library");
     }
   });
-});
+}
+
+btnScan.addEventListener("click", () => runEpicScan(!hasAuth));
 
 // ── Steam scan ────────────────────────────────────────────────────────────
 function setSteamAuthState(auth) {

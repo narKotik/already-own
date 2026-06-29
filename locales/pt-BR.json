@@ -57,6 +57,7 @@
   "scan_zero_steam": "⚠️ Scan Steam executado mas 0 jogos encontrados — verifique a aba Logs.",
   "noauth_epic": "Não conectado à Epic no Chrome — clique para abrir a loja e entrar.",
   "noauth_steam": "Não conectado à Steam — clique para abrir a loja e entrar.",
+  "warming_up_epic": "⏳ Abrindo a Epic Store para carregar sua sessão e depois escanear…",
   "scan_resuming_epic": "⏳ Scan da Epic em andamento em segundo plano…",
   "scan_resuming_steam": "⏳ Scan do Steam em andamento em segundo plano…",
   "err_ext": "Erro na extensão — tente recarregar.",

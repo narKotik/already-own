@@ -261,6 +261,35 @@ function _waitForTabComplete(tabId, timeoutMs = 20000) {
   });
 }
 
+// ── Warm up the Epic web session ──────────────────────────────────────────
+// When no usable auth token is in the cookies yet (the user is signed in to
+// Epic but hasn't opened the store this session, so the short-lived EG1 cookie
+// was never minted), loading store.epicgames.com in a background tab triggers
+// Epic's session refresh and writes the token cookie. We then re-read it and
+// close the tab. Returns the token string or null. Opening the tab in the
+// background (active:false) keeps the popup open and never steals focus.
+async function warmUpEpicSession() {
+  let token = await getEpicAuthFromCookies();
+  if (token) return token;
+
+  info("No Epic token yet — warming up the web session via store.epicgames.com");
+  let tab = null;
+  try {
+    tab = await chrome.tabs.create({ url: "https://store.epicgames.com/", active: false });
+    await _waitForTabComplete(tab.id);
+    // Give the SPA a moment to run its auth refresh and write cookies.
+    await new Promise(r => setTimeout(r, 2500));
+    token = await getEpicAuthFromCookies();
+    info(token ? `Warmup succeeded — token now present (${token.length} chars)` : "Warmup finished but still no token (likely signed out)");
+    return token;
+  } catch (e) {
+    warn("Warmup failed", e.message);
+    return await getEpicAuthFromCookies();
+  } finally {
+    if (tab) chrome.tabs.remove(tab.id).catch(() => {});
+  }
+}
+
 // ── Order history API ─────────────────────────────────────────────────────
 async function fetchViaOrderHistory(requestLocale = "en-US") {
   const BASE = "https://accounts.epicgames.com/account/v2/payment/ajaxGetOrderHistory";
@@ -534,12 +563,25 @@ async function doScan(authFromPage, accountIdFromPage) {
   // Real auth tokens (JWT, EG1~) are always >100 chars. Short values from the page
   // extractor are often expiry timestamps or flags that matched a key name containing
   // "token". Prefer by format first, then by length.
-  const authToken =
-    (authFromPage?.startsWith("EG1~") ? authFromPage : null) ||
-    (cookieToken?.startsWith("EG1~") ? cookieToken : null) ||
-    ((authFromPage?.length || 0) >= 100 ? authFromPage : null) ||
-    cookieToken ||
-    authFromPage;
+  const pickToken = (page, cookie) =>
+    (page?.startsWith("EG1~")   ? page   : null) ||
+    (cookie?.startsWith("EG1~") ? cookie : null) ||
+    ((page?.length || 0) >= 100 ? page   : null) ||
+    cookie ||
+    page;
+
+  let authToken = pickToken(authFromPage, cookieToken);
+  // No real token yet? The user may be signed in to Epic but hasn't opened the
+  // store this session, so the short-lived EG1 cookie was never minted. Warm up
+  // the web session (loads store.epicgames.com in a background tab, then closes
+  // it) and retry — so a single Scan click works instead of needing one click to
+  // open the store and a second to actually scan.
+  const looksReal = tok => !!tok && (tok.startsWith("EG1~") || tok.length >= 100);
+  if (!looksReal(authToken)) {
+    const warmed = await warmUpEpicSession();
+    if (warmed) authToken = pickToken(authFromPage, warmed);
+  }
+
   if (!authToken) {
     warn("No auth token found from page or cookies. Make sure you are logged in to the Epic Store and try again.");
   } else {

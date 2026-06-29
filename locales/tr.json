@@ -57,6 +57,7 @@
   "scan_zero_steam": "⚠️ Steam taraması çalıştı ancak 0 oyun bulundu — Günlükler sekmesini kontrol edin.",
   "noauth_epic": "Chrome'da Epic'e giriş yapılmadı — mağazayı açıp giriş yapmak için tıklayın.",
   "noauth_steam": "Steam'e giriş yapılmadı — mağazayı açıp giriş yapmak için tıklayın.",
+  "warming_up_epic": "⏳ Oturumunuzu yüklemek için Epic Store açılıyor, ardından taranıyor…",
   "scan_resuming_epic": "⏳ Epic taraması arka planda devam ediyor…",
   "scan_resuming_steam": "⏳ Steam taraması arka planda devam ediyor…",
   "err_ext": "Uzantı hatası — yeniden yüklemeyi deneyin.",

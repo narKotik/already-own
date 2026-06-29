@@ -57,6 +57,7 @@
   "scan_zero_steam": "⚠️ Escaneo Steam ejecutado pero 0 juegos encontrados — revisa la pestaña Registros.",
   "noauth_epic": "No has iniciado sesión en Epic en Chrome — haz clic para abrir la tienda e iniciar sesión.",
   "noauth_steam": "No has iniciado sesión en Steam — haz clic para abrir la tienda e iniciar sesión.",
+  "warming_up_epic": "⏳ Abriendo la Epic Store para cargar tu sesión y luego escanear…",
   "scan_resuming_epic": "⏳ El escaneo de Epic se está ejecutando en segundo plano…",
   "scan_resuming_steam": "⏳ El escaneo de Steam se está ejecutando en segundo plano…",
   "err_ext": "Error de extensión — intenta recargar.",
