@@ -258,6 +258,9 @@
   let _aoResult = undefined;
   let _aoStrings = null;
   let _aoComputing = false;
+  let _aoPrevProductTitle = null; // <h1> of the product page we last matched against
+  let _aoStaleTitle = null;       // previous product's title to ignore during an SPA transition
+  let _aoNavAt = 0;               // timestamp (ms) of the last product→product navigation
 
   async function _computeEpicMatch(slug) {
     const stored = await new Promise(r => chrome.storage.local.get([SETTINGS_KEY, LIBRARY_KEY, ELS_DISMISSED_KEY], r));
@@ -277,6 +280,17 @@
 
     const pageTitle = getEpicGameTitle();
     if (!pageTitle) return undefined; // title not rendered yet — retry on next tick
+    // Epic's SPA changes the URL before re-rendering the page body, so right after
+    // a product→product jump the <h1> can still show the PREVIOUS game. Computing
+    // now would cache that game's match under the new slug — a stale badge that
+    // never refreshes (and "wrong match" would dismiss the wrong game). If the
+    // title still equals the previous product's, wait for the new one to render,
+    // but give up after a short grace period so a page whose title legitimately
+    // never changes isn't blocked forever.
+    if (_aoStaleTitle && pageTitle === _aoStaleTitle && Date.now() - _aoNavAt < 1500) {
+      return undefined;
+    }
+    _aoPrevProductTitle = pageTitle;
 
     const { match, matchedTitle, confidence } = elsIsMatch(pageTitle, candidates.map(g => g.title), settings);
     if (!match) return null;
@@ -290,7 +304,9 @@
   async function reconcileEpicBadge() {
     if (!/\/p\//i.test(location.pathname)) {
       document.getElementById("els-epic-badge")?.remove();
-      _aoSlug = null; _aoResult = undefined;
+      // Forget the last product title too: the stale-title guard below should only
+      // kick in for a direct product→product jump, not when returning from search.
+      _aoSlug = null; _aoResult = undefined; _aoPrevProductTitle = null;
       return;
     }
 
@@ -299,6 +315,10 @@
       // Navigated to a different product — reset cache and clear any old badge.
       _aoSlug = slug;
       _aoResult = undefined;
+      // Guard against Epic's URL-changes-before-render race: have the next compute
+      // wait until the <h1> stops showing the product we just left.
+      _aoStaleTitle = _aoPrevProductTitle;
+      _aoNavAt = Date.now();
       document.getElementById("els-epic-badge")?.remove();
     }
 
